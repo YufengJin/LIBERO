@@ -177,12 +177,30 @@ def libero_dataset_download(datasets="all", download_dir=None, check_overwrite=T
         "libero_100",
     ]
 
-    datasets_to_download = [
-        "libero_object",
-        "libero_goal",
-        "libero_spatial",
-        "libero_100",
-    ] if datasets == "all" else [datasets]
+    if datasets == "all":
+        # Hugging Face has libero_10 and libero_90 as separate folders (no libero_100)
+        # Original links have libero_100 as a single zip
+        if use_huggingface:
+            datasets_to_download = [
+                "libero_object",
+                "libero_goal",
+                "libero_spatial",
+                "libero_10",
+                "libero_90",
+            ]
+        else:
+            datasets_to_download = [
+                "libero_object",
+                "libero_goal",
+                "libero_spatial",
+                "libero_100",
+            ]
+    else:
+        # When requesting a specific dataset, map libero_100 to libero_10+libero_90 for HF
+        if datasets == "libero_100" and use_huggingface:
+            datasets_to_download = ["libero_10", "libero_90"]
+        else:
+            datasets_to_download = [datasets]
 
     for dataset_name in datasets_to_download:
         print(f"Downloading {dataset_name}")

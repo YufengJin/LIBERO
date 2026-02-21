@@ -25,6 +25,11 @@ def parse_args():
         action="store_true",
         help="Use Hugging Face instead of original download links"
     )
+    parser.add_argument(
+        "--hf-mirror",
+        action="store_true",
+        help="Use Hugging Face mirror (hf-mirror.com) for better access in China. Equivalent to HF_ENDPOINT=https://hf-mirror.com"
+    )
     return parser.parse_args()
 
 
@@ -39,6 +44,9 @@ def main():
 
     if args.use_huggingface:
         print("Using Hugging Face as the download source")
+        if args.hf_mirror:
+            os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+            print("Using HF mirror (hf-mirror.com) for China access")
     else:
         print("Using original download links (note: these may expire soon)")
         input_str = input("Download from original links may lead to failures. Do you want to continue? (y/n): ")

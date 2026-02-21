@@ -1,0 +1,5 @@
+assets: /workspace/libero/libero/assets
+bddl_files: /workspace/libero/libero/bddl_files
+benchmark_root: /workspace/libero/libero
+datasets: /workspace/libero/libero/../datasets
+init_states: /workspace/libero/libero/init_files
