@@ -2,26 +2,15 @@
 """
 run_demo.py -- LIBERO demo client (WebSocket).
 
-Runs a LIBERO task in simulation and delegates action inference to a remote
-Policy Server over WebSocket.  For visualization / sanity-checking only;
-no eval logs or success-rate tracking.
+Runs a LIBERO task in simulation, delegates action inference to a Policy Server over WebSocket.
+For demo only; no eval logs or success-rate tracking. Default: headless, saves videos to demo_log/.
 
 Usage:
-    # Start the policy server first:
     python tests/test_random_policy_server.py --port 8000
-
-    # Run demo (headless, default task suite libero_10, task 0):
-    python scripts/run_demo.py \
-        --task_suite_name libero_10 \
-        --task_id 0 \
-        --num_resets 3 \
-        --policy_server_addr localhost:8000
-
-    # Specify image resolution and disable image flipping:
-    python scripts/run_demo.py --img_res 128 --no_flip_images
-
-    # DROID format for OpenPI DROID policy (joint_vel, DROID obs):
+    python scripts/run_demo.py --task_suite_name libero_10 --policy_server_addr localhost:8000
+    python scripts/run_demo.py --gui --task_suite_name libero_10 --policy_server_addr localhost:8000
     python scripts/run_demo.py --droid --policy_server_addr localhost:8000 --task_suite_name libero_10
+    python scripts/run_demo.py --arm_controller joint_pos --policy_server_addr localhost:8000 --task_suite_name libero_10
 """
 
 import argparse
@@ -30,11 +19,14 @@ import os
 import signal
 import sys
 import time
+from datetime import datetime
 
+import imageio
 import numpy as np
 
 from libero.libero import benchmark, get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
+from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils.run_utils import (
     ARM_CONTROLLER_MAP,
     enable_joint_pos_observable,
@@ -75,16 +67,25 @@ def _get_env_action_dim(env):
     return 8
 
 
-def _create_env(task, img_res, controller="OSC_POSE"):
+def _create_env(task, img_res, controller="OSC_POSE", use_gui=False):
     task_bddl_file = os.path.join(
         get_libero_path("bddl_files"), task.problem_folder, task.bddl_file
     )
-    env = OffScreenRenderEnv(
+    env_kwargs = dict(
         bddl_file_name=task_bddl_file,
         controller=controller,
         camera_heights=img_res,
         camera_widths=img_res,
     )
+    if use_gui:
+        env = ControlEnv(
+            **env_kwargs,
+            has_renderer=True,
+            has_offscreen_renderer=True,
+            render_camera="agentview",
+        )
+    else:
+        env = OffScreenRenderEnv(**env_kwargs)
     env.seed(0)
     return env
 
@@ -102,9 +103,27 @@ def _prepare_observation(obs, task_description, flip_images=True):
     }
 
 
-def run_episode(args, env, task_description, policy, episode_idx, max_steps):
+def save_rollout_video(primary_images, wrist_images, episode_idx, success,
+                      task_description, output_dir):
+    """Save a concatenated MP4 of primary | wrist camera views."""
+    os.makedirs(output_dir, exist_ok=True)
+    tag = task_description.lower().replace(" ", "_").replace("\n", "_").replace(".", "_")[:40]
+    filename = f"episode={episode_idx}--success={success}--task={tag}.mp4"
+    mp4_path = os.path.join(output_dir, filename)
+    writer = imageio.get_writer(mp4_path, fps=30, format="FFMPEG", codec="libx264")
+    for p, w in zip(primary_images, wrist_images):
+        frame = np.concatenate([p, w], axis=1)
+        writer.append_data(frame)
+    writer.close()
+    print(f"Saved rollout video: {mp4_path}")
+    return mp4_path
+
+
+def run_episode(args, env, task_description, policy, episode_idx, max_steps,
+                use_gui=False, save_video=False):
     droid = getattr(args, "droid", False)
-    dummy = DUMMY_ACTION_JOINT_VEL if droid else DUMMY_ACTION_OSC
+    arm_controller = getattr(args, "arm_controller", "cartesian_pose")
+    dummy = DUMMY_ACTION_JOINT_VEL if arm_controller in ("joint_pos", "joint_vel") else DUMMY_ACTION_OSC
 
     NUM_WAIT_STEPS = 10
     for _ in range(NUM_WAIT_STEPS):
@@ -114,6 +133,7 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps):
     episode_length = 0
     env_action_dim = _get_env_action_dim(env)
     arm_controller = getattr(args, "arm_controller", "cartesian_pose")
+    replay_primary, replay_wrist = [], []
 
     for t in range(max_steps):
         if droid:
@@ -121,8 +141,14 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps):
                 obs, task_description,
                 flip_images=args.flip_images, img_size=args.img_res
             )
+            if save_video:
+                replay_primary.append(observation["observation/exterior_image_1_left"].copy())
+                replay_wrist.append(observation["observation/wrist_image_left"].copy())
         else:
             observation = _prepare_observation(obs, task_description, args.flip_images)
+            if save_video:
+                replay_primary.append(observation["primary_image"].copy())
+                replay_wrist.append(observation["wrist_image"].copy())
 
         start = time.time()
         result = policy.infer(observation)
@@ -136,6 +162,9 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps):
         obs, reward, done, info = env.step(action.tolist() if hasattr(action, "tolist") else action)
         episode_length += 1
 
+        if use_gui:
+            env.env.render()
+
         if done:
             success = True
             print(f"  Success at t={t}!")
@@ -145,7 +174,7 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps):
         f"  Episode {episode_idx}: {'SUCCESS' if success else 'FAILURE'} "
         f"(length={episode_length})"
     )
-    return success, episode_length
+    return success, episode_length, replay_primary, replay_wrist
 
 
 def parse_args():
@@ -171,6 +200,13 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=195, help="Random seed")
     parser.add_argument("--droid", action="store_true",
                         help="Use DROID obs format (joint_vel, OpenPI DROID policy)")
+    parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
+                        choices=list(ARM_CONTROLLER_MAP.keys()),
+                        help="Arm controller type (ignored when --droid)")
+    parser.add_argument("--gui", action="store_true",
+                        help="Enable interactive GUI rendering (default: headless no_gui)")
+    parser.add_argument("--demo_log_dir", type=str, default="./demo_log",
+                        help="Directory for saved videos in no_gui mode")
     return parser.parse_args()
 
 
@@ -213,6 +249,13 @@ def main():
     print(f"  flip_images:     {args.flip_images}")
     print(f"  droid:           {getattr(args, 'droid', False)}")
     print(f"  arm_controller:  {getattr(args, 'arm_controller', 'cartesian_pose')} ({ARM_CONTROLLER_MAP.get(getattr(args, 'arm_controller', 'cartesian_pose'), 'OSC_POSE')})")
+    print(f"  GUI:             {'on (--gui)' if args.gui else 'off (no_gui, videos saved)'}")
+    if not args.gui:
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(args.demo_log_dir, f"{args.task_suite_name}--{date_str}")
+        os.makedirs(run_dir, exist_ok=True)
+        args._run_dir = run_dir
+        print(f"  demo_log_dir:    {run_dir}")
     print("=" * 60)
 
     policy = WebsocketClientPolicy(host=host, port=port)
@@ -237,8 +280,10 @@ def main():
     atexit.register(policy.close)
 
     try:
-        controller = "JOINT_VELOCITY" if getattr(args, "droid", False) else "OSC_POSE"
-        env = _create_env(task, args.img_res, controller=controller)
+        use_gui = args.gui
+        save_video = not use_gui
+        controller = ARM_CONTROLLER_MAP[args.arm_controller]
+        env = _create_env(task, args.img_res, controller=controller, use_gui=use_gui)
         if getattr(args, "droid", False):
             enable_joint_pos_observable(env)
 
@@ -264,7 +309,15 @@ def main():
                     }
                     policy.infer(init_obs)
 
-            run_episode(args, env, task_description, policy, ep_idx, max_steps)
+            success, ep_len, replay_primary, replay_wrist = run_episode(
+                args, env, task_description, policy, ep_idx, max_steps,
+                use_gui=use_gui, save_video=save_video,
+            )
+            if save_video and replay_primary and replay_wrist:
+                save_rollout_video(
+                    replay_primary, replay_wrist, ep_idx, success, task_description,
+                    output_dir=getattr(args, "_run_dir", args.demo_log_dir),
+                )
 
         env.close()
         env = None

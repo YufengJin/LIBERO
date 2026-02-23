@@ -13,3 +13,5 @@
  matplotlib==3.5.3 
  cloudpickle==2.1.0
  gym==0.25.2
+ imageio
+ policy-websocket @ git+https://github.com/YufengJin/policy_websocket.git

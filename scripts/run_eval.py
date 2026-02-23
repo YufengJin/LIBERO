@@ -2,27 +2,14 @@
 """
 run_eval.py -- LIBERO evaluation client (WebSocket).
 
-Runs the LIBERO simulation loop and delegates action inference to a remote
-Policy Server over WebSocket.  Evaluates all tasks in a given task suite,
-saves rollout videos and a text log -- matching the robocasa eval output
-conventions.
+Runs the LIBERO simulation loop, delegates action inference to a Policy Server over WebSocket.
+Evaluates all tasks in a task suite, saves rollout videos and log to <log_dir>/<task_suite>--<timestamp>/.
 
 Usage:
-    # Start the policy server first:
     python tests/test_random_policy_server.py --port 8000
-
-    # Run evaluation:
-    python scripts/run_eval.py \
-        --task_suite_name libero_10 \
-        --num_trials_per_task 50 \
-        --policy randomPolicy \
-        --seed 195 \
-        --policy_server_addr localhost:8000
-
-    # DROID format for OpenPI DROID policy (joint_vel, DROID obs):
+    python scripts/run_eval.py --task_suite_name libero_10 --policy_server_addr localhost:8000
     python scripts/run_eval.py --droid --policy_server_addr localhost:8000 --task_suite_name libero_10
-
-    Logs and videos are written to: <log_dir>/<task_suite_name>--<YYYYMMDD_HHMMSS>/
+    python scripts/run_eval.py --arm_controller joint_pos --policy_server_addr localhost:8000 --task_suite_name libero_10
 """
 
 import argparse
@@ -75,7 +62,7 @@ def _get_env_action_dim(env):
     action_space = getattr(inner, "action_space", None)
     if action_space is not None and hasattr(action_space, "shape"):
         return int(action_space.shape[0])
-    return 8  # fallback for joint_vel
+    return 8
 
 
 def log(msg: str, log_file=None):
@@ -85,8 +72,6 @@ def log(msg: str, log_file=None):
         log_file.write(msg + "\n")
         log_file.flush()
 
-
-# -- environment helpers ------------------------------------------------------
 
 def _create_env(task, img_res, controller="OSC_POSE"):
     task_bddl_file = os.path.join(
@@ -115,8 +100,6 @@ def _prepare_observation(obs, task_description, flip_images=True):
     }
 
 
-# -- video saving ------------------------------------------------------------
-
 def save_rollout_video(primary_images, wrist_images, episode_idx, success,
                        task_description, output_dir):
     """Save a concatenated MP4 of primary | wrist camera views."""
@@ -133,13 +116,12 @@ def save_rollout_video(primary_images, wrist_images, episode_idx, success,
     return mp4_path
 
 
-# -- episode / task runners ---------------------------------------------------
-
 def run_episode(args, env, task_description, policy, episode_idx, max_steps,
                 log_file=None):
     """Run a single evaluation episode."""
     droid = getattr(args, "droid", False)
-    dummy = DUMMY_ACTION_JOINT_VEL if droid else DUMMY_ACTION_OSC
+    arm_controller = getattr(args, "arm_controller", "cartesian_pose")
+    dummy = DUMMY_ACTION_JOINT_VEL if arm_controller in ("joint_pos", "joint_vel") else DUMMY_ACTION_OSC
 
     NUM_WAIT_STEPS = 10
     for _ in range(NUM_WAIT_STEPS):
@@ -206,7 +188,7 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
     log(f"Task {task_id}: {task_description}", log_file)
     log(f"{'=' * 60}", log_file)
 
-    controller = "JOINT_VELOCITY" if getattr(args, "droid", False) else "OSC_POSE"
+    controller = ARM_CONTROLLER_MAP[args.arm_controller]
     env = _create_env(task, args.img_res, controller=controller)
     if getattr(args, "droid", False):
         enable_joint_pos_observable(env)
@@ -271,8 +253,6 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
     return task_sr, task_avg_len
 
 
-# -- main ---------------------------------------------------------------------
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="LIBERO WebSocket evaluation client",
@@ -306,6 +286,9 @@ def parse_args():
     parser.add_argument("--no_save_video", action="store_false", dest="save_video")
     parser.add_argument("--droid", action="store_true",
                         help="Use DROID obs format (joint_vel, OpenPI DROID policy)")
+    parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
+                        choices=list(ARM_CONTROLLER_MAP.keys()),
+                        help="Arm controller type (ignored when --droid)")
     return parser.parse_args()
 
 
@@ -315,8 +298,6 @@ def main():
         args.arm_controller = "joint_vel"
 
     np.random.seed(args.seed)
-
-    # Log directory: <base>/<task_suite_name>--YYYYMMDD_HHMMSS/
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(args.log_dir, f"{args.task_suite_name}--{date_str}")
     os.makedirs(run_dir, exist_ok=True)
@@ -324,8 +305,6 @@ def main():
 
     log_path = os.path.join(run_dir, "eval.log")
     log_file = open(log_path, "w")
-
-    # Run header
     log("=" * 60, log_file)
     log("LIBERO WebSocket Eval Run", log_file)
     log("=" * 60, log_file)
@@ -352,7 +331,6 @@ def main():
     policy = WebsocketClientPolicy(host=host, port=port)
     log(f"Server metadata: {policy.get_server_metadata()}", log_file)
 
-    # Graceful shutdown
     def _cleanup(signum=None, frame=None):
         print("\nCleaning up ...", flush=True)
         policy.close()
@@ -366,13 +344,10 @@ def main():
     signal.signal(signal.SIGTERM, _cleanup)
     atexit.register(policy.close)
 
-    # Initialize LIBERO benchmark
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[args.task_suite_name]()
     num_tasks = task_suite.n_tasks
     log(f"Task suite: {args.task_suite_name} ({num_tasks} tasks)", log_file)
-
-    # Counters (mutable list so nested functions can update)
     global_ep_counter = [0]
     global_successes = [0]
 
@@ -386,7 +361,6 @@ def main():
             )
             per_task_sr.append(task_sr)
 
-        # Final summary
         total_episodes = global_ep_counter[0]
         total_successes = global_successes[0]
         overall_sr = total_successes / total_episodes if total_episodes > 0 else 0.0

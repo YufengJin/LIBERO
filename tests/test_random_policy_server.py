@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-Test policy server for LIBERO -- returns random actions via WebSocket.
+Test policy server for LIBERO — returns random actions via WebSocket.
 
 Usage:
     python tests/test_random_policy_server.py --port 8000
 
 Then connect with:
+    python scripts/run_demo.py --policy_server_addr localhost:8000 --task_suite_name libero_10
     python scripts/run_eval.py --policy_server_addr localhost:8000 --task_suite_name libero_10
 
-    For DROID mode, run server with --droid and connect with --droid:
-    python tests/test_random_policy_server.py --port 8000 --droid
-    python scripts/run_eval.py --droid --policy_server_addr localhost:8000 --task_suite_name libero_10
+DROID mode: add --droid to both server and client.
 """
 
 import argparse
@@ -31,13 +30,15 @@ logger = logging.getLogger(__name__)
 
 
 class RandomPolicy(BasePolicy):
-    """Returns uniformly random small actions. 7-DOF (OSC) or 8-DOF (joint_vel/DROID)."""
+    """Returns uniformly random small actions. Adapts to action_dim from init_obs (e.g. joint_pos)."""
 
     def __init__(self, droid: bool = False) -> None:
         self._action_dim: int = 8 if droid else 7
         self._scale: float = 0.1
 
     def infer(self, obs: Dict) -> Dict:
+        if "action_dim" in obs and "primary_image" not in obs:
+            self._action_dim = int(obs["action_dim"])
         action = np.random.uniform(-self._scale, self._scale, size=self._action_dim).astype(np.float64)
         action[-1] = -1.0  # gripper closed
         return {"actions": action}

@@ -10,7 +10,7 @@ ENV PATH=$MAMBA_ROOT_PREFIX/bin:$PATH
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 # ---------------------------------------------------------
-# System dependencies (MuJoCo/robosuite rendering, SSL, etc.)
+# System dependencies (MuJoCo/robosuite rendering, SSL, etc.) + debug tools
 # ---------------------------------------------------------
 RUN apt-get update && apt-get install -y \
     curl \
@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     lsof \
     psmisc \
+    tmux \
+    vim \
+    x11-apps \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------
