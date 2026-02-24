@@ -1,5 +1,5 @@
 """Shared utilities for run_eval.py and run_demo.py (WebSocket policy scripts).
-Adapted from robocasa for LIBERO DROID support."""
+Client sends raw robosuite obs; policy server handles all remapping."""
 
 from typing import Dict
 
@@ -86,93 +86,15 @@ def get_arm_action_dim(arm_controller: str) -> int:
     return ARM_CONTROLLER_ACTION_DIMS.get(arm_controller, 7)
 
 
-DROID_IMG_SIZE = 224
-
-
-def _ensure_uint8_hwc(
-    img: np.ndarray, target_hw: tuple = (DROID_IMG_SIZE, DROID_IMG_SIZE)
-) -> np.ndarray:
-    """Convert image to uint8 HWC and resize to target if needed."""
-    img = np.asarray(img)
-    if np.issubdtype(img.dtype, np.floating):
-        img = (np.clip(img, 0, 1) * 255).astype(np.uint8)
-    elif img.dtype != np.uint8:
-        img = img.astype(np.uint8)
-    if img.ndim == 3 and img.shape[0] == 3:
-        img = np.transpose(img, (1, 2, 0))
-    h, w = target_hw
-    if img.shape[0] != h or img.shape[1] != w:
-        from PIL import Image
-        img = np.array(Image.fromarray(img).resize((w, h), resample=Image.BICUBIC))
-    return img
-
-
-def _gripper_qpos_to_droid(gripper_qpos: np.ndarray) -> np.ndarray:
-    """Map Panda robot0_gripper_qpos (2,) to DROID gripper_position (1,) in [0,1]. 0=open, 1=closed."""
-    q = np.asarray(gripper_qpos).flatten()
-    val = (q[0] + q[1]) / 2.0 if len(q) >= 2 else float(q[0])
-    return np.array([np.clip(val / 0.04, 0.0, 1.0)], dtype=np.float64)
-
-
-def prepare_observation_droid(
-    obs: dict,
-    task_description: str,
-    flip_images: bool = True,
-    img_size: int = DROID_IMG_SIZE,
-) -> dict:
-    """Convert raw LIBERO observation to OpenPI DROID format.
-
-    LIBERO uses agentview_image (not robot0_agentview_left_image).
-    Returns a dict with keys expected by DROID policy:
-        observation/exterior_image_1_left, observation/wrist_image_left,
-        observation/joint_position, observation/gripper_position, prompt
+def get_expected_policy_action_dim(arm_controller: str) -> int:
+    """Return the policy output dimension expected by this arm controller.
+    cartesian_pose -> 7 (6 pose + 1 gripper); joint_pos/joint_vel -> 8 (7 joints + 1 gripper).
     """
-    target_hw = (img_size, img_size)
-
-    exterior = obs.get("agentview_image")
-    wrist = obs.get("robot0_eye_in_hand_image")
-    if flip_images:
-        if exterior is not None:
-            exterior = np.flipud(exterior).copy()
-        if wrist is not None:
-            wrist = np.flipud(wrist).copy()
-
-    exterior = (
-        _ensure_uint8_hwc(exterior, target_hw)
-        if exterior is not None
-        else np.zeros((*target_hw, 3), dtype=np.uint8)
-    )
-    wrist = (
-        _ensure_uint8_hwc(wrist, target_hw)
-        if wrist is not None
-        else np.zeros((*target_hw, 3), dtype=np.uint8)
-    )
-
-    joint_pos = obs.get("robot0_joint_pos")
-    if joint_pos is None:
-        raise KeyError(
-            "robot0_joint_pos not in observation. Enable it when creating env for --droid, "
-            "e.g. env.modify_observable(observable_name='robot0_joint_pos', attribute='active', modifier=True)"
-        )
-    joint_pos = np.asarray(joint_pos, dtype=np.float64).flatten()
-    if joint_pos.shape[0] != 7:
-        raise ValueError(f"robot0_joint_pos must be 7D, got shape {joint_pos.shape}")
-
-    gripper_qpos = obs["robot0_gripper_qpos"]
-    gripper_pos = _gripper_qpos_to_droid(gripper_qpos)
-
-    return {
-        "observation/exterior_image_1_left": exterior,
-        "observation/wrist_image_left": wrist,
-        "observation/joint_position": joint_pos,
-        "observation/gripper_position": gripper_pos,
-        "prompt": task_description,
-    }
+    return get_arm_action_dim(arm_controller) + 1
 
 
 def enable_joint_pos_observable(env) -> None:
-    """Enable robot0_joint_pos observable for DROID mode.
-
+    """Enable robot0_joint_pos observable. Call once after env creation.
     LIBERO ControlEnv wraps env.env (robosuite). Access inner env if needed.
     """
     target = getattr(env, "env", env)

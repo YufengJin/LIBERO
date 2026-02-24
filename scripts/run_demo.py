@@ -3,14 +3,15 @@
 run_demo.py -- LIBERO demo client (WebSocket).
 
 Runs a LIBERO task in simulation, delegates action inference to a Policy Server over WebSocket.
+Client sends raw robosuite obs; policy server handles all remapping.
 For demo only; no eval logs or success-rate tracking. Default: headless, saves videos to demo_log/.
 
 Usage:
-    python tests/test_random_policy_server.py --port 8000
     python scripts/run_demo.py --task_suite_name libero_10 --policy_server_addr localhost:8000
     python scripts/run_demo.py --gui --task_suite_name libero_10 --policy_server_addr localhost:8000
-    python scripts/run_demo.py --droid --policy_server_addr localhost:8000 --task_suite_name libero_10
-    python scripts/run_demo.py --arm_controller joint_pos --policy_server_addr localhost:8000 --task_suite_name libero_10
+    # OpenVLA (7D): --arm_controller cartesian_pose
+    # OpenPI (8D):  --arm_controller joint_vel
+    python scripts/run_demo.py --arm_controller joint_vel --policy_server_addr localhost:8000 --task_suite_name libero_10
 """
 
 import argparse
@@ -30,8 +31,8 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils.run_utils import (
     ARM_CONTROLLER_MAP,
     enable_joint_pos_observable,
+    get_expected_policy_action_dim,
     pad_action_for_env,
-    prepare_observation_droid,
 )
 from policy_websocket import WebsocketClientPolicy
 
@@ -90,17 +91,6 @@ def _create_env(task, img_res, controller="OSC_POSE", use_gui=False):
     return env
 
 
-def _prepare_observation(obs, task_description, flip_images=True):
-    img = obs["agentview_image"]
-    wrist_img = obs["robot0_eye_in_hand_image"]
-    if flip_images:
-        img = np.flipud(img)
-        wrist_img = np.flipud(wrist_img)
-    return {
-        "primary_image": img,
-        "wrist_image": wrist_img,
-        "task_description": task_description,
-    }
 
 
 def save_rollout_video(primary_images, wrist_images, episode_idx, success,
@@ -121,7 +111,6 @@ def save_rollout_video(primary_images, wrist_images, episode_idx, success,
 
 def run_episode(args, env, task_description, policy, episode_idx, max_steps,
                 use_gui=False, save_video=False):
-    droid = getattr(args, "droid", False)
     arm_controller = getattr(args, "arm_controller", "cartesian_pose")
     dummy = DUMMY_ACTION_JOINT_VEL if arm_controller in ("joint_pos", "joint_vel") else DUMMY_ACTION_OSC
 
@@ -136,19 +125,11 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps,
     replay_primary, replay_wrist = [], []
 
     for t in range(max_steps):
-        if droid:
-            observation = prepare_observation_droid(
-                obs, task_description,
-                flip_images=args.flip_images, img_size=args.img_res
-            )
-            if save_video:
-                replay_primary.append(observation["observation/exterior_image_1_left"].copy())
-                replay_wrist.append(observation["observation/wrist_image_left"].copy())
-        else:
-            observation = _prepare_observation(obs, task_description, args.flip_images)
-            if save_video:
-                replay_primary.append(observation["primary_image"].copy())
-                replay_wrist.append(observation["wrist_image"].copy())
+        observation = {**obs, "task_description": task_description}
+        if save_video:
+            p, w = obs["agentview_image"], obs["robot0_eye_in_hand_image"]
+            replay_primary.append(p.copy() if hasattr(p, "copy") else p)
+            replay_wrist.append(w.copy() if hasattr(w, "copy") else w)
 
         start = time.time()
         result = policy.infer(observation)
@@ -194,15 +175,10 @@ def parse_args():
     parser.add_argument("--task_id", type=int, default=0, help="Task index within the suite")
     parser.add_argument("--num_resets", type=int, default=3, help="Number of episodes to run")
     parser.add_argument("--img_res", type=int, default=256, help="Camera image resolution (square)")
-    parser.add_argument("--flip_images", action="store_true", default=True,
-                        help="Flip images vertically (LIBERO renders upside-down)")
-    parser.add_argument("--no_flip_images", action="store_false", dest="flip_images")
     parser.add_argument("--seed", type=int, default=195, help="Random seed")
-    parser.add_argument("--droid", action="store_true",
-                        help="Use DROID obs format (joint_vel, OpenPI DROID policy)")
     parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
                         choices=list(ARM_CONTROLLER_MAP.keys()),
-                        help="Arm controller type (ignored when --droid)")
+                        help="cartesian_pose (7D/OpenVLA) or joint_vel (8D/OpenPI)")
     parser.add_argument("--gui", action="store_true",
                         help="Enable interactive GUI rendering (default: headless no_gui)")
     parser.add_argument("--demo_log_dir", type=str, default="./demo_log",
@@ -212,9 +188,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if getattr(args, "droid", False):
-        args.arm_controller = "joint_vel"
-
     np.random.seed(args.seed)
 
     benchmark_dict = benchmark.get_benchmark_dict()
@@ -246,9 +219,7 @@ def main():
     print(f"  policy:         {args.policy}")
     print(f"  policy_server:   ws://{host}:{port}")
     print(f"  img_res:         {args.img_res}")
-    print(f"  flip_images:     {args.flip_images}")
-    print(f"  droid:           {getattr(args, 'droid', False)}")
-    print(f"  arm_controller:  {getattr(args, 'arm_controller', 'cartesian_pose')} ({ARM_CONTROLLER_MAP.get(getattr(args, 'arm_controller', 'cartesian_pose'), 'OSC_POSE')})")
+    print(f"  arm_controller:  {args.arm_controller} ({ARM_CONTROLLER_MAP.get(args.arm_controller, 'OSC_POSE')})")
     print(f"  GUI:             {'on (--gui)' if args.gui else 'off (no_gui, videos saved)'}")
     if not args.gui:
         date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -259,7 +230,15 @@ def main():
     print("=" * 60)
 
     policy = WebsocketClientPolicy(host=host, port=port)
-    print(f"Server metadata: {policy.get_server_metadata()}")
+    metadata = policy.get_server_metadata()
+    print(f"Server metadata: {metadata}")
+    policy_dim = metadata.get("action_dim") or metadata.get("action_dims")
+    expected_dim = get_expected_policy_action_dim(args.arm_controller)
+    if policy_dim is not None and int(policy_dim) != expected_dim:
+        raise ValueError(
+            f"arm_controller={args.arm_controller} expects policy action_dim={expected_dim}, "
+            f"but server returns {policy_dim}. Use cartesian_pose for OpenVLA (7D) or joint_vel for OpenPI (8D)."
+        )
 
     env = None
 
@@ -284,8 +263,7 @@ def main():
         save_video = not use_gui
         controller = ARM_CONTROLLER_MAP[args.arm_controller]
         env = _create_env(task, args.img_res, controller=controller, use_gui=use_gui)
-        if getattr(args, "droid", False):
-            enable_joint_pos_observable(env)
+        enable_joint_pos_observable(env)
 
         for ep_idx in range(args.num_resets):
             print(f"\n--- Reset {ep_idx + 1}/{args.num_resets} ---")
@@ -295,19 +273,18 @@ def main():
             print(f"Task: {task_description}")
 
             policy.reset()
-            if not getattr(args, "droid", False):
-                inner = getattr(env, "env", env)
-                action_spec = getattr(inner, "action_spec", None)
-                if action_spec is not None:
-                    action_low, action_high = action_spec[0], action_spec[1]
-                    init_obs = {
-                        "action_dim": action_low.shape[0],
-                        "action_low": action_low,
-                        "action_high": action_high,
-                        "task_name": args.task_suite_name,
-                        "task_description": task_description,
-                    }
-                    policy.infer(init_obs)
+            inner = getattr(env, "env", env)
+            action_spec = getattr(inner, "action_spec", None)
+            if action_spec is not None:
+                action_low, action_high = action_spec[0], action_spec[1]
+                init_obs = {
+                    "action_dim": action_low.shape[0],
+                    "action_low": action_low,
+                    "action_high": action_high,
+                    "task_name": args.task_suite_name,
+                    "task_description": task_description,
+                }
+                policy.infer(init_obs)
 
             success, ep_len, replay_primary, replay_wrist = run_episode(
                 args, env, task_description, policy, ep_idx, max_steps,

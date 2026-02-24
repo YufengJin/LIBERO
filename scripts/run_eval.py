@@ -3,13 +3,13 @@
 run_eval.py -- LIBERO evaluation client (WebSocket).
 
 Runs the LIBERO simulation loop, delegates action inference to a Policy Server over WebSocket.
+Client sends raw robosuite obs; policy server handles all remapping.
 Evaluates all tasks in a task suite, saves rollout videos and log to <log_dir>/<task_suite>--<timestamp>/.
 
 Usage:
-    python tests/test_random_policy_server.py --port 8000
     python scripts/run_eval.py --task_suite_name libero_10 --policy_server_addr localhost:8000
-    python scripts/run_eval.py --droid --policy_server_addr localhost:8000 --task_suite_name libero_10
-    python scripts/run_eval.py --arm_controller joint_pos --policy_server_addr localhost:8000 --task_suite_name libero_10
+    # OpenVLA (7D): --arm_controller cartesian_pose
+    # OpenPI (8D):  --arm_controller joint_vel
 """
 
 import argparse
@@ -28,8 +28,8 @@ from libero.libero.envs import OffScreenRenderEnv
 from libero.libero.utils.run_utils import (
     ARM_CONTROLLER_MAP,
     enable_joint_pos_observable,
+    get_expected_policy_action_dim,
     pad_action_for_env,
-    prepare_observation_droid,
 )
 from policy_websocket import WebsocketClientPolicy
 
@@ -87,19 +87,6 @@ def _create_env(task, img_res, controller="OSC_POSE"):
     return env
 
 
-def _prepare_observation(obs, task_description, flip_images=True):
-    img = obs["agentview_image"]
-    wrist_img = obs["robot0_eye_in_hand_image"]
-    if flip_images:
-        img = np.flipud(img)
-        wrist_img = np.flipud(wrist_img)
-    return {
-        "primary_image": img,
-        "wrist_image": wrist_img,
-        "task_description": task_description,
-    }
-
-
 def save_rollout_video(primary_images, wrist_images, episode_idx, success,
                        task_description, output_dir):
     """Save a concatenated MP4 of primary | wrist camera views."""
@@ -119,7 +106,6 @@ def save_rollout_video(primary_images, wrist_images, episode_idx, success,
 def run_episode(args, env, task_description, policy, episode_idx, max_steps,
                 log_file=None):
     """Run a single evaluation episode."""
-    droid = getattr(args, "droid", False)
     arm_controller = getattr(args, "arm_controller", "cartesian_pose")
     dummy = DUMMY_ACTION_JOINT_VEL if arm_controller in ("joint_pos", "joint_vel") else DUMMY_ACTION_OSC
 
@@ -135,17 +121,10 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps,
     arm_controller = getattr(args, "arm_controller", "cartesian_pose")
 
     for t in range(max_steps):
-        if droid:
-            observation = prepare_observation_droid(
-                obs, task_description,
-                flip_images=args.flip_images, img_size=args.img_res
-            )
-            replay_primary.append(observation["observation/exterior_image_1_left"].copy())
-            replay_wrist.append(observation["observation/wrist_image_left"].copy())
-        else:
-            observation = _prepare_observation(obs, task_description, args.flip_images)
-            replay_primary.append(observation["primary_image"].copy())
-            replay_wrist.append(observation["wrist_image"].copy())
+        observation = {**obs, "task_description": task_description}
+        p, w = obs["agentview_image"], obs["robot0_eye_in_hand_image"]
+        replay_primary.append(p.copy() if hasattr(p, "copy") else p)
+        replay_wrist.append(w.copy() if hasattr(w, "copy") else w)
 
         start = time.time()
         result = policy.infer(observation)
@@ -190,8 +169,7 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
 
     controller = ARM_CONTROLLER_MAP[args.arm_controller]
     env = _create_env(task, args.img_res, controller=controller)
-    if getattr(args, "droid", False):
-        enable_joint_pos_observable(env)
+    enable_joint_pos_observable(env)
 
     task_successes = []
     task_lengths = []
@@ -205,19 +183,18 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
         log(f"Task description: {task_description}", log_file)
 
         policy.reset()
-        if not getattr(args, "droid", False):
-            inner = getattr(env, "env", env)
-            action_spec = getattr(inner, "action_spec", None)
-            if action_spec is not None:
-                action_low, action_high = action_spec[0], action_spec[1]
-                init_obs = {
-                    "action_dim": action_low.shape[0],
-                    "action_low": action_low,
-                    "action_high": action_high,
-                    "task_name": args.task_suite_name,
-                    "task_description": task_description,
-                }
-                policy.infer(init_obs)
+        inner = getattr(env, "env", env)
+        action_spec = getattr(inner, "action_spec", None)
+        if action_spec is not None:
+            action_low, action_high = action_spec[0], action_spec[1]
+            init_obs = {
+                "action_dim": action_low.shape[0],
+                "action_low": action_low,
+                "action_high": action_high,
+                "task_name": args.task_suite_name,
+                "task_description": task_description,
+            }
+            policy.infer(init_obs)
 
         success, length, rep_p, rep_w = run_episode(
             args, env, task_description, policy,
@@ -272,9 +249,6 @@ def parse_args():
                         help="Number of evaluation episodes per task")
     parser.add_argument("--img_res", type=int, default=256,
                         help="Camera image resolution (square)")
-    parser.add_argument("--flip_images", action="store_true", default=True,
-                        help="Flip images vertically (LIBERO renders upside-down)")
-    parser.add_argument("--no_flip_images", action="store_false", dest="flip_images")
     parser.add_argument("--seed", type=int, default=195, help="Random seed")
     parser.add_argument("--deterministic", action="store_true", default=True,
                         help="Use deterministic seeding per episode")
@@ -284,19 +258,14 @@ def parse_args():
     parser.add_argument("--save_video", action="store_true", default=True,
                         help="Save rollout videos")
     parser.add_argument("--no_save_video", action="store_false", dest="save_video")
-    parser.add_argument("--droid", action="store_true",
-                        help="Use DROID obs format (joint_vel, OpenPI DROID policy)")
     parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
                         choices=list(ARM_CONTROLLER_MAP.keys()),
-                        help="Arm controller type (ignored when --droid)")
+                        help="cartesian_pose (7D/OpenVLA) or joint_vel (8D/OpenPI)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    if getattr(args, "droid", False):
-        args.arm_controller = "joint_vel"
-
     np.random.seed(args.seed)
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(args.log_dir, f"{args.task_suite_name}--{date_str}")
@@ -316,10 +285,8 @@ def main():
     log(f"  policy_server:       {args.policy_server_addr}", log_file)
     log(f"  log_dir (run_dir):   {run_dir}", log_file)
     log(f"  img_res:             {args.img_res}", log_file)
-    log(f"  flip_images:         {args.flip_images}", log_file)
     log(f"  save_video:          {args.save_video}", log_file)
-    log(f"  droid:               {getattr(args, 'droid', False)}", log_file)
-    log(f"  arm_controller:      {getattr(args, 'arm_controller', 'cartesian_pose')} ({ARM_CONTROLLER_MAP.get(getattr(args, 'arm_controller', 'cartesian_pose'), 'OSC_POSE')})", log_file)
+    log(f"  arm_controller:      {args.arm_controller} ({ARM_CONTROLLER_MAP.get(args.arm_controller, 'OSC_POSE')})", log_file)
     log("=" * 60, log_file)
     log("", log_file)
 
@@ -329,7 +296,15 @@ def main():
 
     log(f"Connecting to policy server at ws://{host}:{port} ...", log_file)
     policy = WebsocketClientPolicy(host=host, port=port)
-    log(f"Server metadata: {policy.get_server_metadata()}", log_file)
+    metadata = policy.get_server_metadata()
+    log(f"Server metadata: {metadata}", log_file)
+    policy_dim = metadata.get("action_dim") or metadata.get("action_dims")
+    expected_dim = get_expected_policy_action_dim(args.arm_controller)
+    if policy_dim is not None and int(policy_dim) != expected_dim:
+        raise ValueError(
+            f"arm_controller={args.arm_controller} expects policy action_dim={expected_dim}, "
+            f"but server returns {policy_dim}. Use cartesian_pose for OpenVLA (7D) or joint_vel for OpenPI (8D)."
+        )
 
     def _cleanup(signum=None, frame=None):
         print("\nCleaning up ...", flush=True)

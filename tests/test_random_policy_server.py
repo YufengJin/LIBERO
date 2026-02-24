@@ -9,7 +9,7 @@ Then connect with:
     python scripts/run_demo.py --policy_server_addr localhost:8000 --task_suite_name libero_10
     python scripts/run_eval.py --policy_server_addr localhost:8000 --task_suite_name libero_10
 
-DROID mode: add --droid to both server and client.
+Use --arm_controller cartesian_pose (7D) or joint_vel (8D) to match server action_dim.
 """
 
 import argparse
