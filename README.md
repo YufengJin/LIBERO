@@ -23,6 +23,59 @@ ______________________________________________________________________
 ![pull_figure](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/master/images//fig1.png)
 </div>
 
+## Policy WebSocket & installation
+
+This fork integrates **[policy-websocket](https://github.com/YufengJin/policy_websocket)** so you can drive LIBERO with **remote** policies: the simulator sends observations over WebSocket and receives actions from a separate GPU server. You can **swap backends** (OpenPI vs OpenVLA-OFT) using client flags only.
+
+| Policy stack | Repo | `scripts/run_demo.py` flags |
+| ------------ | ---- | ----------------------------- |
+| **OpenPI** (π₀ / π₀.₅ DROID) | [YufengJin/openpi](https://github.com/YufengJin/openpi) | `--arm_controller joint_vel` |
+| **OpenVLA-OFT** | [YufengJin/openvla](https://github.com/YufengJin/openvla) | `--arm_controller cartesian_pose` |
+
+1. Complete **Installation** below (**Docker recommended**; includes `policy-websocket` via `pip install -e .`).
+2. Start the policy server from **openpi** or **openvla** (`scripts/policy_server.py` / `vla-scripts/policy_server.py` — see their READMEs).
+3. Run the demo:
+
+```bash
+micromamba activate libero   # Docker only; skip if using conda below
+# OpenPI (8-D joint_vel + gripper)
+python scripts/run_demo.py --arm_controller joint_vel --policy_server_addr HOST:PORT --task_suite_name libero_10
+# OpenVLA-OFT (7-D cartesian_pose + gripper)
+python scripts/run_demo.py --arm_controller cartesian_pose --policy_server_addr HOST:PORT --task_suite_name libero_10
+```
+
+ROS2 full stack: [role-ros2](https://github.com/YufengJin/role-ros2).
+
+### Installation (Docker, recommended)
+
+Requires Docker, Docker Compose, and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
+
+```bash
+git clone https://github.com/YufengJin/LIBERO.git
+cd LIBERO
+docker compose -f docker/docker-compose.headless.yaml up --build -d
+docker exec -it libero_container bash
+# In container: micromamba activate libero
+# Entrypoint runs pip install -e . (pulls policy-websocket from setup.py) and initializes LIBERO config.
+```
+
+GUI (`run_demo.py --gui`): `xhost +local:docker` then `docker compose -f docker/docker-compose.x11.yaml up --build -d`. Details: **[docker/README.md](docker/README.md)**.
+
+### Installation (conda, optional)
+
+```bash
+conda create -n libero python=3.8.13
+conda activate libero
+git clone https://github.com/YufengJin/LIBERO.git
+cd LIBERO
+pip install -r requirements.txt
+pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install -e .
+```
+(`policy-websocket` is installed as a dependency of `pip install -e .`.)
+
+---
+
 **LIBERO** is designed for studying knowledge transfer in multitask and lifelong robot learning problems. Successfully resolving these problems require both declarative knowledge about objects/spatial relationships and procedural knowledge about motion/behaviors. **LIBERO** provides:
 - a procedural generation pipeline that could in principle generate an infinite number of manipulation tasks.
 - 130 tasks grouped into four task suites: **LIBERO-Spatial**, **LIBERO-Object**, **LIBERO-Goal**, and **LIBERO-100**. The first three task suites have controlled distribution shifts, meaning that they require the transfer of a specific type of knowledge. In contrast, **LIBERO-100** consists of 100 manipulation tasks that require the transfer of entangled knowledge. **LIBERO-100** is further splitted into **LIBERO-90** for pretraining a policy and **LIBERO-10** for testing the agent's downstream lifelong learning performance.
@@ -35,7 +88,7 @@ ______________________________________________________________________
 
 # Contents
 
-- [Installation](#Installation)
+- [Policy WebSocket & installation](#policy-websocket--installation) (top of this README)
 - [Datasets](#Dataset)
 - [Getting Started](#Getting-Started)
   - [Task](#Task)
@@ -44,22 +97,6 @@ ______________________________________________________________________
 - [Citation](#Citation)
 - [License](#License)
 
-
-# Installtion
-Please run the following commands in the given order to install the dependency for **LIBERO**.
-```
-conda create -n libero python=3.8.13
-conda activate libero
-git clone https://github.com/Lifelong-Robot-Learning/LIBERO.git
-cd LIBERO
-pip install -r requirements.txt
-pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
-```
-
-Then install the `libero` package:
-```
-pip install -e .
-```
 
 # Datasets
 We provide high-quality human teleoperation demonstrations for the four task suites in **LIBERO**. To download the demonstration dataset, run:

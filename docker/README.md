@@ -16,7 +16,7 @@ From the project root:
 cd docker
 docker-compose -f docker-compose.x11.yaml build
 # or
-docker-compose -f docker-compose.headlesss.yaml build
+docker-compose -f docker-compose.headless.yaml build
 ```
 
 With custom image name:
@@ -48,13 +48,13 @@ For batch evaluation, training, or other non-GUI use:
 
 ```bash
 cd docker
-docker-compose -f docker-compose.headlesss.yaml up -d
+docker-compose -f docker-compose.headless.yaml up -d
 ```
 
 Or foreground:
 
 ```bash
-docker-compose -f docker-compose.headlesss.yaml up
+docker-compose -f docker-compose.headless.yaml up
 ```
 
 ## Attach to Container
@@ -69,7 +69,7 @@ docker exec -it libero_container bash
 cd docker
 docker-compose -f docker-compose.x11.yaml down
 # or
-docker-compose -f docker-compose.headlesss.yaml down
+docker-compose -f docker-compose.headless.yaml down
 ```
 
 ## View Logs

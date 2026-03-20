@@ -14,7 +14,9 @@ long_description = "".join(lines)
 setup(
     name="libero",
     packages=[package for package in find_packages() if package.startswith("libero")],
-    install_requires=[],
+    install_requires=[
+        "policy-websocket @ git+https://github.com/YufengJin/policy_websocket.git",
+    ],
     eager_resources=["*"],
     include_package_data=True,
     python_requires=">=3",
