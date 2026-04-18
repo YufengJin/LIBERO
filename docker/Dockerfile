@@ -1,13 +1,16 @@
 # =========================================================
-# LIBERO Dockerfile (Micromamba-based, GPU-ready)
+# LIBERO Dockerfile (uv-based, GPU-ready)
 # =========================================================
-
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV MAMBA_ROOT_PREFIX=/opt/conda
-ENV PATH=$MAMBA_ROOT_PREFIX/bin:$PATH
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV UV_LINK_MODE=copy
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python
+ENV VIRTUAL_ENV=/opt/venv
+# uv sync defaults to .venv in the project dir; pin the pre-created venv (same as robocasa layout intent)
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV PATH=/opt/venv/bin:/root/.local/bin:$PATH
 
 # ---------------------------------------------------------
 # System dependencies (MuJoCo/robosuite rendering, SSL, etc.) + debug tools
@@ -33,50 +36,29 @@ RUN apt-get update && apt-get install -y \
     tmux \
     vim \
     x11-apps \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------
-# Install Micromamba
+# Install uv (copy static binary from official image)
 # ---------------------------------------------------------
-RUN curl -Ls https://github.com/mamba-org/micromamba-releases/releases/latest/download/micromamba-linux-64 -o /usr/bin/micromamba \
- && chmod +x /usr/bin/micromamba
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # ---------------------------------------------------------
-# Create conda environment (Python 3.8 for LIBERO)
+# Create Python 3.8 venv managed by uv
 # ---------------------------------------------------------
-RUN micromamba create -y -n libero python=3.8 -c conda-forge \
- && micromamba clean -a -y
+RUN uv venv /opt/venv --python 3.8
 
 # ---------------------------------------------------------
-# Configure shell hook for micromamba
-# ---------------------------------------------------------
-RUN /bin/bash -c "micromamba shell init -s bash" \
- && echo "micromamba activate libero" >> /root/.bashrc
-
-# ---------------------------------------------------------
-# Upgrade pip
-# ---------------------------------------------------------
-RUN micromamba run -n libero python -m pip install --upgrade pip
-
-# ---------------------------------------------------------
-# Install PyTorch (CUDA 11.3 per LIBERO README)
-# ---------------------------------------------------------
-RUN micromamba run -n libero python -m pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 \
-    --extra-index-url https://download.pytorch.org/whl/cu113
-
-# ---------------------------------------------------------
-# Install requirements.txt + robosuite 1.4.0
-# ---------------------------------------------------------
-COPY requirements.txt /tmp/requirements.txt
-RUN micromamba run -n libero python -m pip install -r /tmp/requirements.txt
-
-# ---------------------------------------------------------
-# Set up workspace directory (libero installed in entrypoint for in-container dev)
+# Pre-install project dependencies (leverages Docker layer cache)
+# Only pyproject.toml + uv.lock are copied so this layer is
+# re-used unless dependencies change.
 # ---------------------------------------------------------
 WORKDIR /workspace
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project
 
 # ---------------------------------------------------------
-# Entrypoint
+# Entrypoint (libero itself is installed editable at container start)
 # ---------------------------------------------------------
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

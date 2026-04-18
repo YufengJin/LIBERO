@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-/opt/venv}"
+
 cd /workspace
 
 # Determine LIBERO project root (may be /workspace/LIBERO when parent is mounted)
@@ -21,7 +23,7 @@ if [ -n "${LIBERO_ROOT}" ]; then
   if [ ! -f "${CONFIG_FILE}" ]; then
     echo "Initializing LIBERO config at ${CONFIG_FILE}..."
     BENCHMARK_ROOT="${LIBERO_ROOT}/libero/libero"
-    micromamba run -n libero python -c "
+    python -c "
 import os
 import yaml
 
@@ -43,7 +45,7 @@ print('Config written to', config_file)
   fi
 
   echo "Installing libero from ${LIBERO_ROOT} (editable)..."
-  micromamba run -n libero pip install -e "${LIBERO_ROOT}"
+  uv pip install -e "${LIBERO_ROOT}"
 
   # Check if datasets exist, prompt to download if not
   DATASETS_DIR="${LIBERO_ROOT}/libero/datasets"
@@ -56,5 +58,5 @@ fi
 if [ $# -eq 0 ]; then
   exec bash
 else
-  exec micromamba run -n libero "$@"
+  exec "$@"
 fi

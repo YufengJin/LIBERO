@@ -114,6 +114,19 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps,
     arm_controller = getattr(args, "arm_controller", "cartesian_pose")
     dummy = DUMMY_ACTION_JOINT_VEL if arm_controller in ("joint_pos", "joint_vel") else DUMMY_ACTION_OSC
 
+    # [BETA WARNING] Joint-space controllers (joint_pos / joint_vel) are NOT the
+    # officially recommended control mode for LIBERO. The official LIBERO datasets
+    # were collected with OSC_POSE (cartesian_pose). Joint control is provided
+    # solely for compatibility with DROID-style datasets and is in beta — expect
+    # potential instability or reduced task success rates.
+    if arm_controller in ("joint_pos", "joint_vel"):
+        print(
+            f"\n[WARNING] arm_controller='{arm_controller}' is in BETA. "
+            "Joint-space control is NOT the officially recommended mode for LIBERO. "
+            "LIBERO datasets use cartesian_pose (OSC_POSE); joint control is provided "
+            "only for DROID dataset compatibility and may be unstable.\n"
+        )
+
     NUM_WAIT_STEPS = 10
     for _ in range(NUM_WAIT_STEPS):
         obs, _, _, _ = env.step(dummy)

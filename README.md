@@ -37,7 +37,7 @@ This fork integrates **[policy-websocket](https://github.com/YufengJin/policy_we
 3. Run the demo:
 
 ```bash
-micromamba activate libero   # Docker only; skip if using conda below
+# Docker: uv 管理的虚拟环境在 /opt/venv，已在 PATH 中；conda 安装请忽略此行
 # OpenPI (8-D joint_vel + gripper)
 python scripts/run_demo.py --arm_controller joint_vel --policy_server_addr HOST:PORT --task_suite_name libero_10
 # OpenVLA-OFT (7-D cartesian_pose + gripper)
@@ -55,8 +55,7 @@ git clone https://github.com/YufengJin/LIBERO.git
 cd LIBERO
 docker compose -f docker/docker-compose.headless.yaml up --build -d
 docker exec -it libero_container bash
-# In container: micromamba activate libero
-# Entrypoint runs pip install -e . (pulls policy-websocket from setup.py) and initializes LIBERO config.
+# 容器内直接使用 python（/opt/venv）；entrypoint 会 uv pip install -e . 并初始化 LIBERO 配置
 ```
 
 GUI (`run_demo.py --gui`): `xhost +local:docker` then `docker compose -f docker/docker-compose.x11.yaml up --build -d`. Details: **[docker/README.md](docker/README.md)**.

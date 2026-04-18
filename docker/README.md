@@ -8,6 +8,10 @@ This document describes how to build and run LIBERO containers.
 - NVIDIA Docker runtime configured (for GPU support)
 - For X11 mode: X11 server running on the host
 
+## Python environment
+
+镜像使用 [uv](https://github.com/astral-sh/uv) 在 `/opt/venv` 安装依赖（构建时 `uv sync --frozen`，与仓库根目录 `pyproject.toml` / `uv.lock` 一致）。`PATH` 已包含 `/opt/venv/bin`，进入容器后直接运行 `python` 即可，无需再激活 conda/mamba。
+
 ## Build Image
 
 From the project root:
@@ -129,7 +133,7 @@ The entrypoint auto-creates `~/.libero/config.yaml` (or `$LIBERO_ROOT/.libero/co
 Inside the container:
 
 ```bash
-micromamba activate libero
+# The uv-managed venv at /opt/venv is already on PATH — use `python` directly.
 
 # Run eval (start policy server first in another terminal)
 python tests/test_random_policy_server.py --port 8000

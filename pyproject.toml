@@ -1,0 +1,48 @@
+[project]
+name = "libero"
+version = "0.1.0"
+description = "LIBERO: Benchmarking Knowledge Transfer for Lifelong Robot Learning"
+readme = "README.md"
+requires-python = ">=3.8,<3.9"
+authors = [
+    { name = "Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, Peter Stone" },
+]
+dependencies = [
+    "hydra-core==1.2.0",
+    "numpy==1.22.4",
+    "wandb==0.13.1",
+    "easydict==1.9",
+    "transformers==4.21.1",
+    "opencv-python==4.6.0.66",
+    "robomimic==0.2.0",
+    "einops==0.4.1",
+    "thop==0.1.1-2209072238",
+    "robosuite==1.4.0",
+    "bddl==1.0.1",
+    "future==0.18.2",
+    "matplotlib==3.5.3",
+    "cloudpickle==2.1.0",
+    "gym==0.25.2",
+    "imageio",
+    "policy-websocket @ git+https://github.com/YufengJin/policy_websocket.git",
+    "torch==1.11.0+cu113",
+    "torchvision==0.12.0+cu113",
+    "torchaudio==0.11.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["libero*"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu113" }
+torchvision = { index = "pytorch-cu113" }
+torchaudio = { index = "pytorch-cu113" }
+
+[[tool.uv.index]]
+name = "pytorch-cu113"
+url = "https://download.pytorch.org/whl/cu113"
+explicit = true
