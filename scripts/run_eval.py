@@ -17,6 +17,7 @@ import atexit
 import os
 import signal
 import sys
+import gc
 import time
 from datetime import datetime
 
@@ -225,6 +226,8 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
                 global_ep_counter[0] - 1, success, task_description,
                 output_dir=args.log_dir,
             )
+        del rep_p, rep_w
+        gc.collect()
 
         sr = sum(task_successes) / len(task_successes) * 100
         log(

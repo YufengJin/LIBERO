@@ -19,6 +19,7 @@ import atexit
 import os
 import signal
 import sys
+import gc
 import time
 from datetime import datetime
 
@@ -308,6 +309,8 @@ def main():
                     replay_primary, replay_wrist, ep_idx, success, task_description,
                     output_dir=getattr(args, "_run_dir", args.demo_log_dir),
                 )
+            del replay_primary, replay_wrist
+            gc.collect()
 
         env.close()
         env = None
