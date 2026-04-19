@@ -93,7 +93,6 @@ def _create_env(task, img_res, controller="OSC_POSE", use_gui=False):
 
 
 
-
 def save_rollout_video(primary_images, wrist_images, episode_idx, success,
                       task_description, output_dir):
     """Save a concatenated MP4 of primary | wrist camera views."""
@@ -189,7 +188,6 @@ def parse_args():
     parser.add_argument("--task_id", type=int, default=0, help="Task index within the suite")
     parser.add_argument("--num_resets", type=int, default=3, help="Number of episodes to run")
     parser.add_argument("--img_res", type=int, default=256, help="Camera image resolution (square)")
-    parser.add_argument("--seed", type=int, default=195, help="Random seed")
     parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
                         choices=list(ARM_CONTROLLER_MAP.keys()),
                         help="cartesian_pose (7D/OpenVLA) or joint_vel (8D/OpenPI)")
@@ -202,7 +200,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    np.random.seed(args.seed)
 
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[args.task_suite_name]()

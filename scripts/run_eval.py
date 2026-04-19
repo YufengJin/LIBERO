@@ -265,13 +265,9 @@ def parse_args():
                         help="Number of evaluation episodes per task")
     parser.add_argument("--img_res", type=int, default=256,
                         help="Camera image resolution (square)")
-    parser.add_argument("--seed", type=int, default=195, help="Random seed")
-    parser.add_argument("--deterministic", action="store_true", default=True,
-                        help="Use deterministic seeding per episode")
-    parser.add_argument("--no_deterministic", action="store_false", dest="deterministic")
     parser.add_argument("--log_dir", type=str, default="./eval_logs",
                         help="Directory for logs and rollout videos")
-    parser.add_argument("--save_video", action="store_true", default=True,
+    parser.add_argument("--save_video", action="store_true", default=False,
                         help="Save rollout videos")
     parser.add_argument("--no_save_video", action="store_false", dest="save_video")
     parser.add_argument("--arm_controller", type=str, default="cartesian_pose",
@@ -282,7 +278,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    np.random.seed(args.seed)
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(args.log_dir, f"{args.task_suite_name}--{date_str}")
     os.makedirs(run_dir, exist_ok=True)
@@ -296,8 +291,6 @@ def main():
     log(f"  policy:              {args.policy}", log_file)
     log(f"  task_suite_name:     {args.task_suite_name}", log_file)
     log(f"  num_trials_per_task: {args.num_trials_per_task}", log_file)
-    log(f"  seed:                {args.seed}", log_file)
-    log(f"  deterministic:       {args.deterministic}", log_file)
     log(f"  policy_server:       {args.policy_server_addr}", log_file)
     log(f"  log_dir (run_dir):   {run_dir}", log_file)
     log(f"  img_res:             {args.img_res}", log_file)
