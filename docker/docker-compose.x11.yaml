@@ -17,6 +17,7 @@ services:
     environment:
       - DISPLAY=${DISPLAY}
       - GPU=${GPU:-all}
+      - LIBERO_CONFIG_PATH=/workspace/.libero
     command: tail -f /dev/null
     deploy:
       resources:
