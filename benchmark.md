@@ -131,3 +131,210 @@ The skill does **not** generate a training script for IL benchmarks — BC train
 - `history.md` — classifier evidence + smoke test results + generation log
 - `docker/README.md` — day-to-day container operations
 - Upstream: [libero-project.github.io](https://libero-project.github.io/) · arXiv 2306.03310
+
+<!-- BEGIN OBS_ACTION_SPEC -->
+## Observation / Action spec (auto-captured)
+
+Captured by `benchmark-env-generator` at `2026-04-27T08:47:13+00:00` from env `libero_spatial` (build expression `OffScreenRenderEnv(bddl_file_name=_bddl, controller='OSC_POSE', camera_heights=128, camera_widths=128)`).
+
+Re-run the skill to refresh; this block is owned by the skill — manual edits will be overwritten.
+
+### obs_spec
+
+| key | dtype | shape | kind | notes |
+|-----|-------|-------|------|-------|
+| `robot0_joint_pos` | `float64` | `[7]` | proprio_joint |  |
+| `robot0_joint_pos_cos` | `float64` | `[7]` | proprio_joint |  |
+| `robot0_joint_pos_sin` | `float64` | `[7]` | proprio_joint |  |
+| `robot0_joint_vel` | `float64` | `[7]` | proprio_velocity |  |
+| `robot0_eef_pos` | `float64` | `[3]` | proprio_pos |  |
+| `robot0_eef_quat` | `float64` | `[4]` | proprio_quat | xyzw layout (robosuite/mujoco convention) |
+| `robot0_gripper_qpos` | `float64` | `[2]` | proprio_gripper |  |
+| `robot0_gripper_qvel` | `float64` | `[2]` | proprio_velocity |  |
+| `agentview_image` | `uint8` | `[128, 128, 3]` | image_primary | robosuite renders upside-down — flipud+fliplr for upright |
+| `robot0_eye_in_hand_image` | `uint8` | `[128, 128, 3]` | image_wrist |  |
+| `robot0_proprio-state` | `float64` | `[39]` | proprio_other |  |
+
+### action_spec
+
+| field | value |
+|-------|-------|
+| shape | `[7]` |
+| dtype | `float64` |
+| low | `[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0]` |
+| high | `[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]` |
+| controller | `OSC_POSE` |
+| components | `['dx', 'dy', 'dz', 'drx', 'dry', 'drz', 'gripper']` |
+| gripper_convention | `open=-1, close=1, binary=True, index=6` |
+
+- `task_description_source`: `_task.language`
+- `step_signature`: `4-tuple`
+
+Authoritative JSON (copy of `~/.claude/skills/benchmark-env-generator/registry/libero.json`):
+
+```json
+{
+  "benchmark_name": "libero",
+  "schema_version": 1,
+  "captured_at": "2026-04-27T08:47:13+00:00",
+  "captured_from": {
+    "repo_path": "/home/yjin/repos/LIBERO",
+    "env_id": "libero_spatial",
+    "make_expr": "OffScreenRenderEnv(bddl_file_name=_bddl, controller='OSC_POSE', camera_heights=128, camera_widths=128)",
+    "category": "IL"
+  },
+  "obs_spec": {
+    "robot0_joint_pos": {
+      "dtype": "float64",
+      "shape": [
+        7
+      ],
+      "kind": "proprio_joint"
+    },
+    "robot0_joint_pos_cos": {
+      "dtype": "float64",
+      "shape": [
+        7
+      ],
+      "kind": "proprio_joint"
+    },
+    "robot0_joint_pos_sin": {
+      "dtype": "float64",
+      "shape": [
+        7
+      ],
+      "kind": "proprio_joint"
+    },
+    "robot0_joint_vel": {
+      "dtype": "float64",
+      "shape": [
+        7
+      ],
+      "kind": "proprio_velocity"
+    },
+    "robot0_eef_pos": {
+      "dtype": "float64",
+      "shape": [
+        3
+      ],
+      "kind": "proprio_pos"
+    },
+    "robot0_eef_quat": {
+      "dtype": "float64",
+      "shape": [
+        4
+      ],
+      "kind": "proprio_quat",
+      "notes": "xyzw layout (robosuite/mujoco convention)"
+    },
+    "robot0_gripper_qpos": {
+      "dtype": "float64",
+      "shape": [
+        2
+      ],
+      "kind": "proprio_gripper"
+    },
+    "robot0_gripper_qvel": {
+      "dtype": "float64",
+      "shape": [
+        2
+      ],
+      "kind": "proprio_velocity"
+    },
+    "agentview_image": {
+      "dtype": "uint8",
+      "shape": [
+        128,
+        128,
+        3
+      ],
+      "kind": "image_primary",
+      "notes": "robosuite renders upside-down \u2014 flipud+fliplr for upright"
+    },
+    "robot0_eye_in_hand_image": {
+      "dtype": "uint8",
+      "shape": [
+        128,
+        128,
+        3
+      ],
+      "kind": "image_wrist"
+    },
+    "robot0_proprio-state": {
+      "dtype": "float64",
+      "shape": [
+        39
+      ],
+      "kind": "proprio_other"
+    }
+  },
+  "action_spec": {
+    "shape": [
+      7
+    ],
+    "dtype": "float64",
+    "low": [
+      -1.0,
+      -1.0,
+      -1.0,
+      -1.0,
+      -1.0,
+      -1.0,
+      -1.0
+    ],
+    "high": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "controller": "OSC_POSE",
+    "gripper_convention": {
+      "open": -1,
+      "close": 1,
+      "binary": true,
+      "index": 6
+    },
+    "components": [
+      "dx",
+      "dy",
+      "dz",
+      "drx",
+      "dry",
+      "drz",
+      "gripper"
+    ]
+  },
+  "task_description_source": "_task.language",
+  "step_signature": "4-tuple",
+  "smoke_test_passed": true,
+  "dropped_task_specific_keys": [
+    "akita_black_bowl_1_pos",
+    "akita_black_bowl_1_quat",
+    "akita_black_bowl_1_to_robot0_eef_pos",
+    "akita_black_bowl_1_to_robot0_eef_quat",
+    "akita_black_bowl_2_pos",
+    "akita_black_bowl_2_quat",
+    "akita_black_bowl_2_to_robot0_eef_pos",
+    "akita_black_bowl_2_to_robot0_eef_quat",
+    "cookies_1_pos",
+    "cookies_1_quat",
+    "cookies_1_to_robot0_eef_pos",
+    "cookies_1_to_robot0_eef_quat",
+    "glazed_rim_porcelain_ramekin_1_pos",
+    "glazed_rim_porcelain_ramekin_1_quat",
+    "glazed_rim_porcelain_ramekin_1_to_robot0_eef_pos",
+    "glazed_rim_porcelain_ramekin_1_to_robot0_eef_quat",
+    "plate_1_pos",
+    "plate_1_quat",
+    "plate_1_to_robot0_eef_pos",
+    "plate_1_to_robot0_eef_quat",
+    "object-state"
+  ]
+}
+```
+
+<!-- END OBS_ACTION_SPEC -->
