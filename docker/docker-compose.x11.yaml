@@ -3,7 +3,7 @@ version: "3.9"
 services:
   libero:
     container_name: libero_container
-    image: ${IMAGE:-libero:latest}
+    image: ${IMAGE:-yufengjin/libero:latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
