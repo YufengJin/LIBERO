@@ -1,0 +1,33 @@
+{
+  "primary_install_strategy": "uv-sync-frozen",
+  "system_apt_packages": ["libegl1", "libosmesa6", "libgl1", "libglib2.0-0"],
+  "third_party_clones": [],
+  "installation_steps": [
+    {"kind": "apt_install", "pkgs": ["libegl1", "libosmesa6", "libgl1", "libglib2.0-0"]},
+    {"kind": "uv_pip_install", "args": ["--no-deps", "setuptools>=62.3,<81"]},
+    {"kind": "uv_sync", "args": ["--frozen", "--no-install-project", "--active"]}
+  ],
+  "post_install_hooks": [
+    {
+      "kind": "shell",
+      "cmd": "mkdir -p /workspace/.libero && python -c \"import yaml; f='/workspace/.libero/config.yaml'; open(f,'w').write(yaml.dump({'datasets_default_path':'/workspace/libero/datasets'}))\" 2>/dev/null || true",
+      "when": "first_run"
+    }
+  ],
+  "runtime_env_vars": [
+    {"key": "LIBERO_CONFIG_PATH", "value": "/workspace/.libero", "evidence": "entrypoint must set LIBERO_CONFIG_PATH to prevent interactive prompt on first import libero.libero"}
+  ],
+  "evidence": {
+    "readme_quotes": [
+      "conda create -n libero python=3.8.13 ... pip install -r requirements.txt ... pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113 ... pip install -e .",
+      "Docker recommended: docker compose -f docker/docker-compose.headless.yaml up --build -d",
+      "uv sync --frozen (docker/README.md: 'The image uses uv in /opt/venv; uv sync --frozen at build time, consistent with pyproject.toml / uv.lock')"
+    ],
+    "ambiguities": [
+      "README conda instructions use CUDA 11.3 (torch==1.11.0+cu113) but pyproject.toml pins the same cu113 index. uv.lock is present and frozen — using uv-sync-frozen as primary strategy since Docker is the recommended path.",
+      "needs_render_libs quirk triggered (robosuite/mujoco in deps) — auto-injecting libegl1 libosmesa6 libgl1 libglib2.0-0 apt packages.",
+      "needs_setuptools_pin quirk triggered (robosuite present, pkg_resources user) — auto-injecting setuptools>=62.3,<81 before uv sync.",
+      "LIBERO has an interactive config prompt on first import (libero/libero/__init__.py:66 calls input()); post_install_hook writes /workspace/.libero/config.yaml to bypass it. LIBERO_CONFIG_PATH env var must be set in compose."
+    ]
+  }
+}

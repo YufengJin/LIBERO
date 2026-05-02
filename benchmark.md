@@ -135,7 +135,7 @@ The skill does **not** generate a training script for IL benchmarks — BC train
 <!-- BEGIN OBS_ACTION_SPEC -->
 ## Observation / Action spec (auto-captured)
 
-Captured by `benchmark-env-generator` at `2026-04-27T08:47:13+00:00` from env `libero_spatial` (build expression `OffScreenRenderEnv(bddl_file_name=_bddl, controller='OSC_POSE', camera_heights=128, camera_widths=128)`).
+Captured by `benchmark-generator` at `2026-05-02T06:31:11+00:00` from env `libero_spatial` (build expression `OffScreenRenderEnv(bddl_file_name=_bddl, controller='OSC_POSE', camera_heights=128, camera_widths=128)`).
 
 Re-run the skill to refresh; this block is owned by the skill — manual edits will be overwritten.
 
@@ -167,16 +167,16 @@ Re-run the skill to refresh; this block is owned by the skill — manual edits w
 | components | `['dx', 'dy', 'dz', 'drx', 'dry', 'drz', 'gripper']` |
 | gripper_convention | `open=-1, close=1, binary=True, index=6` |
 
-- `task_description_source`: `_task.language`
+- `task_description_source`: `<UNKNOWN>`
 - `step_signature`: `4-tuple`
 
-Authoritative JSON (copy of `~/.claude/skills/benchmark-env-generator/registry/libero.json`):
+Authoritative JSON (copy of `~/.claude/skills/benchmark-generator/registry/libero.json`):
 
 ```json
 {
   "benchmark_name": "libero",
   "schema_version": 1,
-  "captured_at": "2026-04-27T08:47:13+00:00",
+  "captured_at": "2026-05-02T06:31:11+00:00",
   "captured_from": {
     "repo_path": "/home/yjin/repos/LIBERO",
     "env_id": "libero_spatial",
@@ -308,7 +308,7 @@ Authoritative JSON (copy of `~/.claude/skills/benchmark-env-generator/registry/l
       "gripper"
     ]
   },
-  "task_description_source": "_task.language",
+  "task_description_source": "<UNKNOWN>",
   "step_signature": "4-tuple",
   "smoke_test_passed": true,
   "dropped_task_specific_keys": [

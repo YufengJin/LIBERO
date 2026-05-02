@@ -1,62 +1,51 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
-export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-/opt/venv}"
+# Sync sentinel for setup.sh (IsaacGym workflow). Harmless when no setup.sh
+# is reading it — just an empty file in /tmp that gets touched at end.
+rm -f /tmp/entrypoint_done
 
-cd /workspace
+export PATH="/opt/venv/bin:/usr/local/bin:${PATH:-/usr/bin:/bin}"
+export VIRTUAL_ENV="/opt/venv"
 
-# Determine LIBERO project root (may be /workspace/LIBERO when parent is mounted)
-LIBERO_ROOT=""
-if [ -f /workspace/LIBERO/setup.py ]; then
-  LIBERO_ROOT="/workspace/LIBERO"
-elif [ -f /workspace/setup.py ]; then
-  LIBERO_ROOT="/workspace"
+# ── 1. Editable install (project mounted at /workspace/libero) ─────
+# Both branches resolve install_requires by default. If you need --no-deps
+# (e.g. to avoid uv re-resolving heavy science stack), add a `post_install_hooks`
+# entry to install_plan.json that re-runs the install with --no-deps.
+if [ -f "/workspace/libero/pyproject.toml" ]; then
+    echo ">> Installing editable package (pyproject.toml)..."
+    cd /workspace/libero && uv pip install -e . --index-strategy unsafe-best-match && cd - > /dev/null
+elif [ -f "/workspace/libero/setup.py" ]; then
+    echo ">> Installing editable package (setup.py)..."
+    cd /workspace/libero && uv pip install -e . --index-strategy unsafe-best-match && cd - > /dev/null
 fi
 
-# Install libero in editable mode when source is mounted
-if [ -n "${LIBERO_ROOT}" ]; then
-  # Create LIBERO config BEFORE any libero import (avoids interactive prompt during pip install)
-  # Use workspace path so config persists on the mounted volume
-  export LIBERO_CONFIG_PATH="${LIBERO_ROOT}/.libero"
-  mkdir -p "${LIBERO_CONFIG_PATH}"
-  CONFIG_FILE="${LIBERO_CONFIG_PATH}/config.yaml"
-  if [ ! -f "${CONFIG_FILE}" ]; then
-    echo "Initializing LIBERO config at ${CONFIG_FILE}..."
-    BENCHMARK_ROOT="${LIBERO_ROOT}/libero/libero"
-    python -c "
-import os
-import yaml
-
-config_dir = '${LIBERO_CONFIG_PATH}'
-os.makedirs(config_dir, exist_ok=True)
-config_file = os.path.join(config_dir, 'config.yaml')
-benchmark_root = '${BENCHMARK_ROOT}'
-config = {
-    'benchmark_root': benchmark_root,
-    'bddl_files': os.path.join(benchmark_root, 'bddl_files'),
-    'init_states': os.path.join(benchmark_root, 'init_files'),
-    'datasets': os.path.join(benchmark_root, '../datasets'),
-    'assets': os.path.join(benchmark_root, 'assets'),
+# ── 2. Post-install hooks from InstallationPlan ──────────────────────────────
+# Rendered by render_base.py from <repo>/.nautilus/install_plan.json's
+# `post_install_hooks`. `when=first_run` entries are wrapped in a sentinel
+# guard; `when=every_run` entries fire on every container start.
+if [ ! -f /tmp/.nautilus.first-run ]; then
+    mkdir -p /workspace/.libero && python -c "
+import yaml, os
+import libero.libero as _ll
+_pkg = os.path.dirname(_ll.__file__)
+_cfg = {
+    'benchmark_root': _pkg,
+    'bddl_files': os.path.join(_pkg, 'bddl_files'),
+    'init_states': os.path.join(_pkg, 'init_files'),
+    'datasets': '/workspace/libero/datasets',
+    'assets': os.path.join(_pkg, 'assets'),
 }
-with open(config_file, 'w') as f:
-    yaml.dump(config, f)
-print('Config written to', config_file)
-"
-  fi
-
-  echo "Installing libero from ${LIBERO_ROOT} (editable)..."
-  uv pip install -e "${LIBERO_ROOT}"
-
-  # Check if datasets exist, prompt to download if not
-  DATASETS_DIR="${LIBERO_ROOT}/libero/datasets"
-  if [ ! -d "${DATASETS_DIR}" ] || [ -z "$(ls -A "${DATASETS_DIR}" 2>/dev/null)" ]; then
-    echo "[INFO] Datasets not found at ${DATASETS_DIR}."
-    echo "       Run: python benchmark_scripts/download_libero_datasets.py --use-huggingface"
-  fi
+open('/workspace/.libero/config.yaml','w').write(yaml.dump(_cfg))
+" 2>/dev/null || true
+    touch /tmp/.nautilus.first-run
 fi
 
-if [ $# -eq 0 ]; then
-  exec bash
-else
-  exec "$@"
-fi
+# 
+# Slot for downstream sub-skills to inject project-specific steps.
+
+# <<<EXTENSION_ENTRYPOINT_INSERT_ABOVE>>> — sub-skills insert pre-exec hooks above this line
+
+echo ">> Ready."
+touch /tmp/entrypoint_done
+exec "$@"

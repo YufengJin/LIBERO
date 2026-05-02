@@ -1,0 +1,34 @@
+{
+  "classification": "benchmark",
+  "classification_confidence": "high",
+  "classification_reason": "LIBERO is explicitly described as a simulation benchmark providing 130 manipulation tasks across five suites (libero_spatial, libero_object, libero_goal, libero_10, libero_90) built on robosuite+MuJoCo, with task suites, evaluation harness, and demonstration datasets — all canonical benchmark signals.",
+  "cuda_source": "torch-pin",
+  "cuda_tag_source": "synthesized",
+  "cuda_variant": "runtime",
+  "cuda_version": "11.8",
+  "cudnn_version": "cudnn8",
+  "has_flash_attn": false,
+  "has_pyproject": true,
+  "has_requirements": true,
+  "has_setup_py": true,
+  "has_uv_lock": true,
+  "markdown_files": [
+    "README.md",
+    "benchmark.md",
+    "docker/README.md",
+    "history.md",
+    "install.md"
+  ],
+  "needs_render_libs": true,
+  "needs_setuptools_pin": true,
+  "project_name": "LIBERO",
+  "python_version": "3.8",
+  "quirks": [
+    "needs_render_libs",
+    "needs_setuptools_pin"
+  ],
+  "readme_path": "README.md",
+  "torch_cuda_detected": true,
+  "ubuntu_version": "20.04",
+  "base_image": "nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04"
+}
