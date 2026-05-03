@@ -2,14 +2,22 @@
 """
 Test policy server for LIBERO — returns random actions via WebSocket.
 
-Usage:
-    python tests/test_random_policy_server.py --port 8000
+Purpose:
+    Random-policy WebSocket server used by the benchmark-generator L3_IL smoke
+    test and as a quick connectivity check for users wiring in their own policy
+    backends. Ignores the ``__meta__`` envelope on every payload — only the
+    action_dim from the init handshake matters.
+
+Example:
+    # Cartesian-pose 7D (default, matches OpenVLA-OFT)
+    python tests/test_random_policy_server.py --port 8765
+
+    # Joint-vel 8D (matches OpenPI / DROID)
+    python tests/test_random_policy_server.py --port 8765 --droid
 
 Then connect with:
-    python scripts/run_demo.py --policy_server_addr localhost:8000 --task_suite_name libero_10
-    python scripts/run_eval.py --policy_server_addr localhost:8000 --task_suite_name libero_10
-
-Use --arm_controller cartesian_pose (7D) or joint_vel (8D) to match server action_dim.
+    python scripts/run_demo.py --policy_server_addr localhost:8765 --task_suite_name libero_10
+    python scripts/run_eval.py --policy_server_addr localhost:8765 --task_suite_name libero_10
 """
 
 import argparse
@@ -50,7 +58,7 @@ class RandomPolicy(BasePolicy):
 def main():
     parser = argparse.ArgumentParser(description="LIBERO test policy server (random actions)")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--droid", action="store_true",
                         help="DROID mode: return 8-dim joint_vel actions")
     args = parser.parse_args()
@@ -65,12 +73,28 @@ def main():
         port=args.port,
         metadata=metadata,
     )
+    # Write PID file so smoke runners can `kill $(cat /tmp/policy_server_<port>.pid)`.
+    pid_path = f"/tmp/policy_server_{args.port}.pid"
+    try:
+        with open(pid_path, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pid_path = None
+
     print(f"Starting RandomPolicy server on ws://{args.host}:{args.port}")
+    if pid_path is not None:
+        print(f"PID file: {pid_path}")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        if pid_path is not None:
+            try:
+                os.remove(pid_path)
+            except OSError:
+                pass
     print("Server stopped, port released.")
 
 

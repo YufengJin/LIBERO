@@ -2,14 +2,22 @@
 """
 run_eval.py -- LIBERO evaluation client (WebSocket).
 
-Runs the LIBERO simulation loop, delegates action inference to a Policy Server over WebSocket.
-Client sends raw robosuite obs; policy server handles all remapping.
-Evaluates all tasks in a task suite, saves rollout videos and log to <log_dir>/<task_suite>--<timestamp>/.
+Purpose:
+    Iterate every task in a LIBERO suite x ``--num_trials_per_task`` rollouts
+    against a remote `policy_websocket`-compatible policy server. Logs per-task
+    + overall success rates to ``<log_dir>/<suite>--<timestamp>/eval.log`` and,
+    optionally, an MP4 per episode. Sends the mandatory ``__meta__`` envelope
+    on every payload so multi-benchmark policy servers can dispatch correctly.
 
-Usage:
-    python scripts/run_eval.py --task_suite_name libero_10 --policy_server_addr localhost:8000
-    # OpenVLA (7D): --arm_controller cartesian_pose
-    # OpenPI (8D):  --arm_controller joint_vel
+Example:
+    # Full smoke (1 trial per task) + videos
+    python scripts/run_eval.py --policy_server_addr localhost:8765 \\
+        --task_suite_name libero_spatial --num_trials_per_task 1 \\
+        --arm_controller cartesian_pose --save_video
+
+    # OpenPI (8D joint_vel)
+    python scripts/run_eval.py --policy_server_addr localhost:8765 \\
+        --task_suite_name libero_10 --arm_controller joint_vel
 """
 
 import argparse
@@ -136,6 +144,14 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps,
 
     for t in range(max_steps):
         observation = {**obs, "task_description": task_description}
+        # Mandatory __meta__ envelope (benchmark-generator IL contract).
+        observation["__meta__"] = {
+            "v": 1,
+            "benchmark": "libero",
+            "task": f"{getattr(args, 'task_suite_name', '')}/{episode_idx}",
+            "task_description": task_description,
+            "phase": "step",
+        }
         p, w = obs["agentview_image"], obs["robot0_eye_in_hand_image"]
         replay_primary.append(p.copy() if hasattr(p, "copy") else p)
         replay_wrist.append(w.copy() if hasattr(w, "copy") else w)
@@ -207,6 +223,14 @@ def run_task(args, task_suite, task_id, policy, global_ep_counter,
                 "action_high": action_high,
                 "task_name": args.task_suite_name,
                 "task_description": task_description,
+                # Mandatory __meta__ envelope (benchmark-generator IL contract).
+                "__meta__": {
+                    "v": 1,
+                    "benchmark": "libero",
+                    "task": f"{args.task_suite_name}/{task_id}",
+                    "task_description": task_description,
+                    "phase": "init",
+                },
             }
             policy.infer(init_obs)
 
@@ -252,7 +276,7 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--policy_server_addr", type=str, default="localhost:8000",
+        "--policy_server_addr", type=str, default="localhost:8765",
         help="Address of the WebSocket policy server (host:port)",
     )
     parser.add_argument("--policy", type=str, default="randomPolicy",
@@ -300,7 +324,7 @@ def main():
     log("", log_file)
 
     addr = args.policy_server_addr
-    host, port = (addr.rsplit(":", 1) if ":" in addr else (addr, "8000"))
+    host, port = (addr.rsplit(":", 1) if ":" in addr else (addr, "8765"))
     port = int(port)
 
     log(f"Connecting to policy server at ws://{host}:{port} ...", log_file)

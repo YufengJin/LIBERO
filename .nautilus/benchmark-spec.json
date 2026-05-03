@@ -1,7 +1,7 @@
 {
   "benchmark_name": "libero",
   "schema_version": 1,
-  "captured_at": "2026-05-02T06:31:11+00:00",
+  "captured_at": "2026-05-03T07:33:18+00:00",
   "captured_from": {
     "repo_path": "/home/yjin/repos/LIBERO",
     "env_id": "libero_spatial",

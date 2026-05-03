@@ -10,24 +10,25 @@
   "post_install_hooks": [
     {
       "kind": "shell",
-      "cmd": "mkdir -p /workspace/.libero && python -c \"import yaml; f='/workspace/.libero/config.yaml'; open(f,'w').write(yaml.dump({'datasets_default_path':'/workspace/libero/datasets'}))\" 2>/dev/null || true",
+      "cmd": "mkdir -p /workspace/.libero && python -c \"\nimport yaml, os, importlib.util\n# Use find_spec so libero's __init__.py is NOT executed (it triggers an\n# interactive 'specify dataset path?' prompt when config.yaml is absent).\n_spec = importlib.util.find_spec('libero.libero')\n_pkg = os.path.dirname(_spec.origin)\n_cfg = {\n    'benchmark_root': _pkg,\n    'bddl_files': os.path.join(_pkg, 'bddl_files'),\n    'init_states': os.path.join(_pkg, 'init_files'),\n    'datasets': '/workspace/libero/datasets',\n    'assets': os.path.join(_pkg, 'assets'),\n}\nopen('/workspace/.libero/config.yaml','w').write(yaml.dump(_cfg))\n\"",
       "when": "first_run"
     }
   ],
   "runtime_env_vars": [
-    {"key": "LIBERO_CONFIG_PATH", "value": "/workspace/.libero", "evidence": "entrypoint must set LIBERO_CONFIG_PATH to prevent interactive prompt on first import libero.libero"}
+    {"key": "LIBERO_CONFIG_PATH", "value": "/workspace/.libero", "evidence": "libero/__init__.py reads os.environ['LIBERO_CONFIG_PATH'] for config location; must be set so get_libero_path('init_states') works without interactive prompt"}
   ],
   "evidence": {
     "readme_quotes": [
       "conda create -n libero python=3.8.13 ... pip install -r requirements.txt ... pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113 ... pip install -e .",
       "Docker recommended: docker compose -f docker/docker-compose.headless.yaml up --build -d",
-      "uv sync --frozen (docker/README.md: 'The image uses uv in /opt/venv; uv sync --frozen at build time, consistent with pyproject.toml / uv.lock')"
+      "uv sync --frozen (docker/README.md: 'The image uses uv in /opt/venv; uv sync --frozen at build time, consistent with pyproject.toml / uv.lock')",
+      "task_bddl_file = os.path.join(get_libero_path('bddl_files'), task.problem_folder, task.bddl_file) ... init_states = task_suite.get_task_init_states(task_id)"
     ],
     "ambiguities": [
       "README conda instructions use CUDA 11.3 (torch==1.11.0+cu113) but pyproject.toml pins the same cu113 index. uv.lock is present and frozen — using uv-sync-frozen as primary strategy since Docker is the recommended path.",
       "needs_render_libs quirk triggered (robosuite/mujoco in deps) — auto-injecting libegl1 libosmesa6 libgl1 libglib2.0-0 apt packages.",
       "needs_setuptools_pin quirk triggered (robosuite present, pkg_resources user) — auto-injecting setuptools>=62.3,<81 before uv sync.",
-      "LIBERO has an interactive config prompt on first import (libero/libero/__init__.py:66 calls input()); post_install_hook writes /workspace/.libero/config.yaml to bypass it. LIBERO_CONFIG_PATH env var must be set in compose."
+      "LIBERO has an interactive config prompt on first import; post_install_hook writes /workspace/.libero/config.yaml with ALL 5 required keys: benchmark_root, bddl_files, init_states, datasets, assets — derived from libero package install path at container start so paths are always correct. LIBERO_CONFIG_PATH env var set in compose to point at this file. (Fixed from prior run that only wrote datasets_default_path.)"
     ]
   }
 }

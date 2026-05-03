@@ -26,9 +26,11 @@ fi
 # guard; `when=every_run` entries fire on every container start.
 if [ ! -f /tmp/.nautilus.first-run ]; then
     mkdir -p /workspace/.libero && python -c "
-import yaml, os
-import libero.libero as _ll
-_pkg = os.path.dirname(_ll.__file__)
+import yaml, os, importlib.util
+# Use find_spec so libero's __init__.py is NOT executed (it triggers an
+# interactive 'specify dataset path?' prompt when config.yaml is absent).
+_spec = importlib.util.find_spec('libero.libero')
+_pkg = os.path.dirname(_spec.origin)
 _cfg = {
     'benchmark_root': _pkg,
     'bddl_files': os.path.join(_pkg, 'bddl_files'),
@@ -37,7 +39,7 @@ _cfg = {
     'assets': os.path.join(_pkg, 'assets'),
 }
 open('/workspace/.libero/config.yaml','w').write(yaml.dump(_cfg))
-" 2>/dev/null || true
+"
     touch /tmp/.nautilus.first-run
 fi
 

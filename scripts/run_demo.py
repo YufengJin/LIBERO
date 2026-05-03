@@ -2,16 +2,21 @@
 """
 run_demo.py -- LIBERO demo client (WebSocket).
 
-Runs a LIBERO task in simulation, delegates action inference to a Policy Server over WebSocket.
-Client sends raw robosuite obs; policy server handles all remapping.
-For demo only; no eval logs or success-rate tracking. Default: headless, saves videos to demo_log/.
+Purpose:
+    Spin up a single LIBERO task in simulation and roll it out against a
+    `policy_websocket`-compatible policy server. Sends raw robosuite obs
+    plus the mandatory ``__meta__`` envelope ({benchmark, task, task_description,
+    phase, v}) and writes per-episode MP4s to ``demo_log/`` in headless mode.
 
-Usage:
-    python scripts/run_demo.py --task_suite_name libero_10 --policy_server_addr localhost:8000
-    python scripts/run_demo.py --gui --task_suite_name libero_10 --policy_server_addr localhost:8000
-    # OpenVLA (7D): --arm_controller cartesian_pose
-    # OpenPI (8D):  --arm_controller joint_vel
-    python scripts/run_demo.py --arm_controller joint_vel --policy_server_addr localhost:8000 --task_suite_name libero_10
+Example:
+    # Cartesian-pose / OpenVLA-OFT (7D action)
+    python scripts/run_demo.py --policy_server_addr localhost:8765 \\
+        --task_suite_name libero_spatial --task_id 0 --num_resets 1 \\
+        --arm_controller cartesian_pose
+
+    # Joint-vel / OpenPI (8D action, beta)
+    python scripts/run_demo.py --policy_server_addr localhost:8765 \\
+        --task_suite_name libero_10 --arm_controller joint_vel
 """
 
 import argparse
@@ -139,6 +144,14 @@ def run_episode(args, env, task_description, policy, episode_idx, max_steps,
 
     for t in range(max_steps):
         observation = {**obs, "task_description": task_description}
+        # Mandatory __meta__ envelope (benchmark-generator IL contract).
+        observation["__meta__"] = {
+            "v": 1,
+            "benchmark": "libero",
+            "task": str(getattr(args, "task_suite_name", "")) + "/" + str(getattr(args, "task_id", 0)),
+            "task_description": task_description,
+            "phase": "step",
+        }
         if save_video:
             p, w = obs["agentview_image"], obs["robot0_eye_in_hand_image"]
             replay_primary.append(p.copy() if hasattr(p, "copy") else p)
@@ -177,7 +190,7 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--policy_server_addr", type=str, default="localhost:8000",
+        "--policy_server_addr", type=str, default="localhost:8765",
         help="WebSocket policy server address host:port",
     )
     parser.add_argument("--policy", type=str, default="randomPolicy", help="Policy name (for display)")
@@ -216,7 +229,7 @@ def main():
     init_states = task_suite.get_task_init_states(args.task_id)
 
     addr = args.policy_server_addr
-    host, port = (addr.rsplit(":", 1) if ":" in addr else (addr, "8000"))
+    host, port = (addr.rsplit(":", 1) if ":" in addr else (addr, "8765"))
     port = int(port)
 
     print("=" * 60)
@@ -294,6 +307,14 @@ def main():
                     "action_high": action_high,
                     "task_name": args.task_suite_name,
                     "task_description": task_description,
+                    # Mandatory __meta__ envelope (benchmark-generator IL contract).
+                    "__meta__": {
+                        "v": 1,
+                        "benchmark": "libero",
+                        "task": f"{args.task_suite_name}/{args.task_id}",
+                        "task_description": task_description,
+                        "phase": "init",
+                    },
                 }
                 policy.infer(init_obs)
 
