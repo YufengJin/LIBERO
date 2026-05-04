@@ -17,3 +17,6 @@ logs/
 libero.egg-info/
 .vscode/
 eval_logs/
+
+# nautilus-managed compose .env (build-time IMAGE tag — never commit)
+docker/.env
