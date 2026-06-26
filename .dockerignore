@@ -1,0 +1,7 @@
+# 保留 libero/(含 bddl_files / init_files / assets)、scripts/、pyproject.toml、uv.lock、
+# requirements.txt、setup.py —— 要烤进镜像。排除会重生成/无关的大件。
+.git
+*.egg-info
+**/__pycache__
+**/*.pyc
+datasets

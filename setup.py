@@ -15,7 +15,7 @@ setup(
     name="libero",
     packages=[package for package in find_packages() if package.startswith("libero")],
     install_requires=[
-        "policy-websocket @ git+https://github.com/YufengJin/policy_websocket.git",
+        "policy-websocket @ git+https://github.com/YufengJin/policy_websocket.git@main",
     ],
     eager_resources=["*"],
     include_package_data=True,

@@ -674,7 +674,7 @@ requires-dist = [
     { name = "matplotlib", specifier = "==3.5.3" },
     { name = "numpy", specifier = "==1.22.4" },
     { name = "opencv-python", specifier = "==4.6.0.66" },
-    { name = "policy-websocket", git = "https://github.com/YufengJin/policy_websocket.git" },
+    { name = "policy-websocket", git = "https://github.com/YufengJin/policy_websocket.git?rev=main" },
     { name = "robomimic", specifier = "==0.2.0" },
     { name = "robosuite", specifier = "==1.4.0" },
     { name = "thop", specifier = "==0.1.1.post2209072238" },
@@ -983,7 +983,7 @@ wheels = [
 [[package]]
 name = "policy-websocket"
 version = "0.1.0"
-source = { git = "https://github.com/YufengJin/policy_websocket.git#37383ebddbbef5576de8d544f41a5ac9941ee178" }
+source = { git = "https://github.com/YufengJin/policy_websocket.git?rev=main#22f6a1b714b222962341fb802a7cdcb09175f657" }
 dependencies = [
     { name = "msgpack" },
     { name = "numpy" },
@@ -1434,8 +1434,8 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cu113/torch-1.11.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:b6a799bdb6ee3d914e5e62bddb4276d4a10248c1af4f2d217738e5f9ee27485b" },
-    { url = "https://download-r2.pytorch.org/whl/cu113/torch-1.11.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:7fd4751bbf39bbb04ec6116c7243ce6528aded4197afcf380537340e1eebd19a" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torch-1.11.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:b6a799bdb6ee3d914e5e62bddb4276d4a10248c1af4f2d217738e5f9ee27485b", upload-time = "2023-10-06T22:21:24Z" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torch-1.11.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:7fd4751bbf39bbb04ec6116c7243ce6528aded4197afcf380537340e1eebd19a", upload-time = "2023-10-06T22:22:23Z" },
 ]
 
 [[package]]
@@ -1451,9 +1451,9 @@ dependencies = [
     { name = "torch", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-macosx_10_15_x86_64.whl", hash = "sha256:f4e9dda9e8d3ce0bbd5e791926219f5054b8b85365c79be2ee90333acf9adbfc" },
-    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:317fd8ec39fddb3af1dad906593b9ecdc3edf68e7f5780c42f8de956585ae480" },
-    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:77add44d291a8a97f3a607cef053f009a27296f5d99f33082c57c4e6c326fafc" },
+    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-macosx_10_15_x86_64.whl", hash = "sha256:f4e9dda9e8d3ce0bbd5e791926219f5054b8b85365c79be2ee90333acf9adbfc", upload-time = "2023-10-06T21:40:46Z" },
+    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:317fd8ec39fddb3af1dad906593b9ecdc3edf68e7f5780c42f8de956585ae480", upload-time = "2023-10-06T21:40:47Z" },
+    { url = "https://download-r2.pytorch.org/whl/torchaudio-0.11.0-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:77add44d291a8a97f3a607cef053f009a27296f5d99f33082c57c4e6c326fafc", upload-time = "2023-10-06T21:40:48Z" },
 ]
 
 [[package]]
@@ -1467,8 +1467,8 @@ dependencies = [
     { name = "torch", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cu113/torchaudio-0.11.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:cee0870e9cf76e43948d85a9aea5fd557a146d77d1f1585d7f55457ce520f33e" },
-    { url = "https://download-r2.pytorch.org/whl/cu113/torchaudio-0.11.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:4d5812856919d0470fe68c2a8485ceb5b44de8a305fba9a36ef27a08022ff11d" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torchaudio-0.11.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:cee0870e9cf76e43948d85a9aea5fd557a146d77d1f1585d7f55457ce520f33e", upload-time = "2023-10-06T23:09:00Z" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torchaudio-0.11.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:4d5812856919d0470fe68c2a8485ceb5b44de8a305fba9a36ef27a08022ff11d", upload-time = "2023-10-06T23:09:01Z" },
 ]
 
 [[package]]
@@ -1483,8 +1483,8 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cu113/torchvision-0.12.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:37133e8c5b0ec2f01999e59116f6d0e36d9afb1c7f8f58bd0c3dc8996f835419" },
-    { url = "https://download-r2.pytorch.org/whl/cu113/torchvision-0.12.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:fc4b4f12f50749c12637261e9efa1cced008753b6ecc8d1c2681fde9dd52b675" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torchvision-0.12.0%2Bcu113-cp38-cp38-linux_x86_64.whl", hash = "sha256:37133e8c5b0ec2f01999e59116f6d0e36d9afb1c7f8f58bd0c3dc8996f835419", upload-time = "2023-10-06T23:09:47Z" },
+    { url = "https://download-r2.pytorch.org/whl/cu113/torchvision-0.12.0%2Bcu113-cp38-cp38-win_amd64.whl", hash = "sha256:fc4b4f12f50749c12637261e9efa1cced008753b6ecc8d1c2681fde9dd52b675", upload-time = "2023-10-06T23:09:48Z" },
 ]
 
 [[package]]

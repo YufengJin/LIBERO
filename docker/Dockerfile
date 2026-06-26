@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y \
 # -----------------------------------------------------------------------------
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
+# 运行时常见把宿主机目录 bind 到 /root，会遮住镜像内 /root/.local/bin；复制 uv 到 PATH 固定位置
+# （集群 apptainer run -B fakeroot:/root 时，entrypoint 的 `uv pip install -e .` 仍可用）。
+RUN cp /root/.local/bin/uv /usr/local/bin/uv && chmod +x /usr/local/bin/uv
 # Alternative (faster, always latest):
 # COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
@@ -40,6 +43,16 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN uv venv --python 3.8 /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV VIRTUAL_ENV="/opt/venv"
+# uv 若下载 Python 到 /root/.local/share/uv/python/...，bind /root 时软链接会失效。
+# 复制到 /opt/python38 并重链，保证任何 bind 场景下 venv Python 可用（uv 用系统 py3.8 时此步为空操作）。
+RUN _py=$(find /root/.local/share/uv/python -maxdepth 3 -name 'python3.8' -type f 2>/dev/null | head -1) && \
+    if [ -n "$_py" ]; then \
+        _dir=$(dirname "$(dirname "$_py")") && \
+        cp -a "$_dir" /opt/python38 && \
+        ln -sf /opt/python38/bin/python3.8 /opt/venv/bin/python && \
+        ln -sf /opt/python38/bin/python3.8 /opt/venv/bin/python3 && \
+        ln -sf /opt/python38/bin/python3.8 /opt/venv/bin/python3.8; \
+    fi
 
 
 
@@ -88,9 +101,24 @@ RUN uv sync --frozen --no-install-project --active
 # <<<EXTENSION_INSERT_ABOVE>>>
 
 # -----------------------------------------------------------------------------
-# 7. Workspace (project source mounted at runtime, not copied)
+# 7. Bake libero source into the image (self-contained)
+# -----------------------------------------------------------------------------
+# 与上游「源码运行时 bind」不同：把 libero 包(含 bddl_files / init_files / assets 等众多小文件)
+# 连同源码 COPY 进镜像并就地 editable 安装，使众多小文件封进 .sif（squashfs 单文件 = 1 inode），
+# 集群上不必 bind 源码。**只**在运行时 bind 演示数据集到 /workspace/libero/datasets（见 entrypoint
+# 生成的 config.yaml）。改 libero 代码需重 build；本地 docker-compose 若仍 bind 源码则兼容退回。
+COPY . /workspace/libero
+RUN cd /workspace/libero && uv pip install -e . --index-strategy unsafe-best-match
+
+# -----------------------------------------------------------------------------
+# 8. Workspace + entrypoint
 # -----------------------------------------------------------------------------
 WORKDIR /workspace/libero
+# libero 从 LIBERO_CONFIG_PATH(默认 ~/.libero)读 config.yaml；entrypoint 把它写到
+# /workspace/.libero，故显式对齐，否则 import libero 会触发交互式数据集路径提问(EOFError)。
+ENV LIBERO_CONFIG_PATH=/workspace/.libero
+# headless EGL 离屏渲染(robosuite/mujoco)，run_eval 仿真必需。
+ENV MUJOCO_GL=egl
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
