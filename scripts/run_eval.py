@@ -22,6 +22,7 @@ Example:
 
 import argparse
 import atexit
+import json
 import os
 import signal
 import sys
@@ -388,6 +389,28 @@ def main():
             t = task_suite.get_task(tid)
             log(f"  [{tid}] {t.language}: {sr:.4f} ({sr * 100:.1f}%)", log_file)
         log("=" * 60, log_file)
+
+        # 机器可读结果（供 eval->wandb 回写用，见 droid_policy_learning/slurm/eval_app.slurm）
+        results = {
+            "benchmark": "libero",
+            "task": args.task_suite_name,
+            "num_episodes": int(total_episodes),
+            "num_success": int(total_successes),
+            "success_rate": float(overall_sr),
+            "avg_task_success_rate": float(avg_task_sr),
+            "per_task": [
+                {
+                    "task_id": tid,
+                    "name": task_suite.get_task(tid).language,
+                    "success_rate": float(sr),
+                }
+                for tid, sr in enumerate(per_task_sr)
+            ],
+        }
+        results_path = os.path.join(run_dir, "results.json")
+        with open(results_path, "w") as rf:
+            json.dump(results, rf, indent=2)
+        log(f"Results JSON: {results_path}", log_file)
 
         log(f"\nLog saved to: {log_path}", log_file)
         print(f"\nLog saved to: {log_path}")
